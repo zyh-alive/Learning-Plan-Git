@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>账单流水</title>
+    <style>
+        * { box-sizing: border-box; }
+        html.embed-in-dashboard, html.embed-in-dashboard body {
+            height: 100%;
+            min-height: 100%;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+            background: linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            padding: 20px 16px 40px;
+        }
+        body.embed-in-dashboard { padding-bottom: 16px; }
+        .top {
+            max-width: 440px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .back {
+            color: rgba(255, 255, 255, 0.88);
+            text-decoration: none;
+            font-size: 15px;
+            white-space: nowrap;
+        }
+        .back:hover { text-decoration: underline; }
+        .sub-hint {
+            max-width: 440px;
+            margin: 0 auto 14px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.55);
+            line-height: 1.5;
+        }
+        .balance-hero {
+            border-radius: 20px;
+            padding: 22px;
+            background: linear-gradient(135deg, #4c6ef5, #7950f2);
+            text-align: center;
+            max-width: 440px;
+            margin: 0 auto 20px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+        }
+        .balance-hero .label { font-size: 13px; color: rgba(255, 255, 255, 0.88); font-weight: 600; }
+        .balance-hero .amount { font-size: 32px; font-weight: 800; color: #fff; margin-top: 6px; }
+        .list-wrap { max-width: 440px; margin: 0 auto; }
+        .item {
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 14px;
+            padding: 16px 18px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+        .item .left { min-width: 0; }
+        .item .left .tid { font-size: 11px; color: #999; margin-bottom: 4px; }
+        .item .left .type-pill {
+            display: inline-block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #434343;
+            margin-bottom: 6px;
+            padding: 3px 10px;
+            border-radius: 8px;
+            background: #f5f5f5;
+            border: 1px solid #eee;
+        }
+        .item .left .amt {
+            font-size: 19px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+        .item .left .amt .unit { font-size: 13px; font-weight: 600; margin-left: 4px; opacity: 0.75; }
+        .item .left .amt.amt-plus { color: #237804; }
+        .item .left .amt.amt-minus { color: #cf1322; }
+        .item .left .amt.amt-neutral { color: #1a1a1a; }
+        .item .left .time { font-size: 12px; color: #888; margin-top: 6px; }
+        .item .after { text-align: right; flex-shrink: 0; }
+        .item .after .t { font-size: 11px; color: #aaa; }
+        .item .after .v { font-size: 15px; font-weight: 600; color: #333; margin-top: 2px; }
+        .empty { text-align: center; color: rgba(255, 255, 255, 0.7); padding: 48px 16px; font-size: 14px; }
+        .empty.err { color: #ffccc7; }
+        .pager {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 20px;
+            align-items: center;
+            max-width: 440px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .pager button {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .pager span { color: rgba(255, 255, 255, 0.85); font-size: 14px; }
+    </style>
+</head>
+<body>
+    <script>
+        if (new URLSearchParams(location.search).get('embed') === '1') {
+            document.documentElement.classList.add('embed-in-dashboard');
+            document.body.classList.add('embed-in-dashboard');
+        }
+    </script>
+    <script src="js/embed-parent-nav.js"></script>
+    <div class="top">
+        <a class="back" href="profile.html" id="backProfile">← 返回个人资料</a>
+    </div>
+    <p class="sub-hint" id="apiNote">
+        客户：按 <code style="color:rgba(255,255,255,0.75)">transactionType</code> 显示类型与红绿正负。顾问：若 <code style="color:rgba(255,255,255,0.75)">fundStatus</code> 为 released，本条固定显示为「收款」、绿色、+。
+    </p>
+    <div class="balance-hero">
+        <div class="label">当前金币余额</div>
+        <div class="amount" id="bal">--</div>
+    </div>
+    <div class="list-wrap" id="wrap"><p class="empty">加载中…</p></div>
+    <div class="pager" id="pager" style="display:none;">
+        <button type="button" id="prev">上一页</button>
+        <span id="pg"></span>
+        <button type="button" id="next">下一页</button>
+    </div>
+    <script>
+        var API = window.location.origin;
+        var token = localStorage.getItem('token');
+        var page = 1;
+        var limit = 20;
+        var totalPages = 1;
+        var role = 'user';
+
+        function formatCoin(v) {
+            if (v == null || v === '') return '0.00';
+            var n = Number(v);
+            if (!Number.isFinite(n)) return '0.00';
+            return n.toFixed(2);
+        }
+        function fmt(t) {
+            if (!t) return '--';
+            try {
+                return new Date(t).toLocaleString('zh-CN');
+            } catch (e) {
+                return t;
+            }
+        }
+        function getRole() {
+            try {
+                var b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+                return String(JSON.parse(decodeURIComponent(escape(atob(b64)))).role || 'user').toLowerCase();
+            } catch (e) {
+                return String(localStorage.getItem('role') || 'user').toLowerCase();
+            }
+        }
+        function balanceAfter(it) {
+            if (role === 'consultant') {
+                return it.consultantBalanceAfter != null ? it.consultantBalanceAfter : it.customerBalanceAfter;
+            }
+            return it.customerBalanceAfter != null ? it.customerBalanceAfter : it.consultantBalanceAfter;
+        }
+        function rowAmountAbs(it) {
+            var v = it.transactionAmount != null ? it.transactionAmount : it.amount;
+            return v != null ? formatCoin(v) : '--';
+        }
+
+        /** 与 fund_transactions.transaction_type 一致：充值、退款 → + 绿色；提现、消费(展示为付款) → − 红色 */
+        function flowTypeMeta(ttype) {
+            var t = ttype != null ? String(ttype).trim() : '';
+            if (t === '充值') {
+                return { label: '充值', sign: '+', cls: 'amt-plus' };
+            }
+            if (t === '订单取消退款') {
+                return { label: '订单取消退款', sign: '+', cls: 'amt-plus' };
+            }
+            if (t === '售后退款') {
+                return { label: '售后退款', sign: '+', cls: 'amt-plus' };
+            }
+            if (t === '提现') {
+                return { label: '提现', sign: '-', cls: 'amt-minus' };
+            }
+            if (t === '消费') {
+                return { label: '付款', sign: '-', cls: 'amt-minus' };
+            }
+            return { label: t || '—', sign: '', cls: 'amt-neutral' };
+        }
+
+        /** 顾问端：资金状态 released → 收款、绿色、+；顾客端始终走 flowTypeMeta，不变 */
+        function rowDisplayMeta(it) {
+            if (role === 'consultant' && String(it.fundStatus || '').toLowerCase() === 'released') {
+                return { label: '收款', sign: '+', cls: 'amt-plus' };
+            }
+            if (role === 'consultant' && String(it.fundStatus || '').toLowerCase() === 'servicing_refunded') {
+                return { label: '售后退款', sign: '-', cls: 'amt-minus' };
+            }
+            if (role === 'user' && String(it.fundStatus || '').toLowerCase() === 'servicing_refunded') {
+                return { label: '售后退款', sign: '+', cls: 'amt-plus' };
+            }
+            return flowTypeMeta(it.transactionType);
+        }
+
+        var embedQs = new URLSearchParams(location.search).get('embed') === '1' ? '?embed=1' : '';
+        document.getElementById('backProfile').href = 'profile.html' + embedQs;
+
+        if (!token) {
+            location.href = 'login.html';
+        } else {
+            role = getRole();
+            if (role !== 'user' && role !== 'consultant') {
+                location.href = 'dashboard.html';
+            }
+
+            function esc(s) {
+                return String(s == null ? '' : s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function loadBal() {
+                fetch(API + '/api/transaction/balance', { headers: { 'Authorization': 'Bearer ' + token } })
+                    .then(function (r) {
+                        return r.json().then(function (d) {
+                            return { r: r, d: d };
+                        });
+                    })
+                    .then(function (x) {
+                        if (!x.r.ok) return;
+                        var c = x.d.data && x.d.data.coin;
+                        document.getElementById('bal').textContent = formatCoin(c);
+                    })
+                    .catch(function () {
+                        document.getElementById('bal').textContent = '--';
+                    });
+            }
+
+            function load() {
+                var wrap = document.getElementById('wrap');
+                wrap.innerHTML = '<p class="empty">加载中…</p>';
+                fetch(
+                    API +
+                        '/api/transaction/customerOrConsultant/history?page=' +
+                        page +
+                        '&limit=' +
+                        limit,
+                    { headers: { 'Authorization': 'Bearer ' + token } }
+                )
+                    .then(function (r) {
+                        return r.text().then(function (text) {
+                            var d = {};
+                            try {
+                                d = text ? JSON.parse(text) : {};
+                            } catch (e) {
+                                d = { message: '响应解析失败' };
+                            }
+                            return { r: r, d: d };
+                        });
+                    })
+                    .then(function (x) {
+                        if (x.r.status === 401 || x.r.status === 403) {
+                            localStorage.removeItem('token');
+                            location.href = 'login.html';
+                            return;
+                        }
+                        if (!x.r.ok) {
+                            wrap.innerHTML =
+                                '<p class="empty err">' + (x.d.message || '加载失败') + '</p>';
+                            return;
+                        }
+                        var list = (x.d.data && x.d.data.list) || [];
+                        if (!Array.isArray(list)) list = [];
+                        var pg = (x.d.data && x.d.data.pagination) || {};
+                        totalPages = Math.max(1, pg.totalPages || 1);
+                        if (list.length === 0) {
+                            wrap.innerHTML = '<p class="empty">暂无流水记录</p>';
+                            document.getElementById('pager').style.display = 'none';
+                            return;
+                        }
+                        wrap.innerHTML = list
+                            .map(function (it) {
+                                var ba = balanceAfter(it);
+                                var meta = rowDisplayMeta(it);
+                                var absPart = rowAmountAbs(it);
+                                var amtHtml =
+                                    meta.sign && absPart !== '--'
+                                        ? esc(meta.sign) + absPart
+                                        : absPart;
+                                return (
+                                    '<div class="item">' +
+                                    '<div class="left">' +
+                                    '<div class="tid">#' +
+                                    esc(String(it.transactionId != null ? it.transactionId : '')) +
+                                    '</div>' +
+                                    '<span class="type-pill">' +
+                                    esc(meta.label) +
+                                    '</span>' +
+                                    '<div class="amt ' +
+                                    meta.cls +
+                                    '">' +
+                                    amtHtml +
+                                    '<span class="unit">金币</span></div>' +
+                                    '<div class="time">' +
+                                    fmt(it.operatedAt) +
+                                    '</div></div>' +
+                                    '<div class="after"><div class="t">交易后余额</div><div class="v">' +
+                                    (ba != null ? formatCoin(ba) : '--') +
+                                    '</div></div></div>'
+                                );
+                            })
+                            .join('');
+                        document.getElementById('pg').textContent = page + ' / ' + totalPages;
+                        document.getElementById('prev').disabled = page <= 1;
+                        document.getElementById('next').disabled = page >= totalPages;
+                        document.getElementById('pager').style.display = totalPages > 1 ? 'flex' : 'none';
+                    })
+                    .catch(function () {
+                        wrap.innerHTML = '<p class="empty err">网络错误，请稍后重试</p>';
+                    });
+            }
+
+            loadBal();
+            load();
+            document.getElementById('prev').onclick = function () {
+                if (page > 1) {
+                    page--;
+                    load();
+                }
+            };
+            document.getElementById('next').onclick = function () {
+                if (page < totalPages) {
+                    page++;
+                    load();
+                }
+            };
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单与评价</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+            background: linear-gradient(165deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+            padding: 16px 16px 32px;
+        }
+        .top {
+            max-width: 440px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .back {
+            color: rgba(255,255,255,0.9);
+            text-decoration: none;
+            font-size: 15px;
+        }
+        .back:hover { text-decoration: underline; }
+        h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            flex: 1;
+        }
+        .sub-hint {
+            max-width: 440px;
+            margin: 0 auto 14px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.55);
+            line-height: 1.5;
+        }
+        .list-wrap { max-width: 440px; margin: 0 auto; }
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 16px 16px 18px;
+            margin-bottom: 12px;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.15);
+        }
+        .card-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 12px;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .oid {
+            font-size: 13px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        .cust {
+            font-size: 13px;
+            color: #666;
+        }
+        .stype {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1a1a1a;
+            width: 100%;
+        }
+        .status-pill {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
+        .st-pr { background: #fff7e6; color: #d46b08; }
+        .st-done { background: #f6ffed; color: #237804; }
+        .st-sr { background: #e6fffb; color: #006d75; }
+        .st-sc { background: #f0f5ff; color: #2f54eb; }
+        .block-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #a0aec0;
+            letter-spacing: 0.08em;
+            margin: 10px 0 6px;
+        }
+        .demand {
+            font-size: 14px;
+            color: #444;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .star-mini-row {
+            display: inline-flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 3px;
+            flex-shrink: 0;
+        }
+        .star-mini-slot {
+            position: relative;
+            width: 1.05em;
+            height: 1em;
+            font-size: 18px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .star-mini-slot-bg {
+            position: absolute;
+            left: 0;
+            top: 0;
+            color: #e8e8e8;
+            pointer-events: none;
+        }
+        .star-mini-slot-fg {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            overflow: hidden;
+            z-index: 1;
+            max-width: 100%;
+            pointer-events: none;
+        }
+        .star-mini-slot-fg-inner {
+            display: block;
+            color: #faad14;
+            white-space: nowrap;
+        }
+        .rev-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 12px;
+        }
+        .rev-score {
+            font-size: 17px;
+            font-weight: 800;
+            color: #1a1a1a;
+        }
+        .rev-text {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.5;
+            margin-top: 6px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .rev-wait {
+            font-size: 13px;
+            color: #d48806;
+            font-weight: 600;
+        }
+        .meta-time {
+            font-size: 12px;
+            color: #888;
+            line-height: 1.5;
+            margin-top: 2px;
+        }
+        .empty {
+            text-align: center;
+            padding: 36px 16px;
+            color: rgba(255,255,255,0.65);
+            font-size: 14px;
+        }
+        .err { color: #ffccc7; }
+    </style>
+</head>
+<body>
+    <script src="js/embed-parent-nav.js"></script>
+    <div class="top">
+        <a class="back" id="backLink" href="profile.html">← 返回</a>
+        <h1 id="pageTitle">订单与评价</h1>
+    </div>
+    <p class="sub-hint" id="subHint"></p>
+    <div class="list-wrap" id="listWrap"><p class="empty">加载中…</p></div>
+    <script>
+        var API = window.location.origin;
+        var token = localStorage.getItem('token');
+        var params = new URLSearchParams(location.search);
+        var filter = params.get('filter') === 'all' ? 'all' : 'reviews_only';
+        var embed = params.get('embed') === '1';
+
+        function esc(t) {
+            return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        }
+        function formatDateTime(v) {
+            if (v == null || v === '') return '—';
+            var d = new Date(v);
+            if (isNaN(d.getTime())) return '—';
+            function z(n) { return ('0' + n).slice(-2); }
+            return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
+        }
+        function starHtml(rating) {
+            var r = Math.max(0, Math.min(5, Number(rating) || 0));
+            var html = '<div class="star-mini-row" aria-hidden="true">';
+            for (var i = 0; i < 5; i++) {
+                var fill = Math.min(100, Math.max(0, (r - i) * 100));
+                html +=
+                    '<span class="star-mini-slot">' +
+                    '<span class="star-mini-slot-bg">★</span>' +
+                    '<span class="star-mini-slot-fg" style="width:' +
+                    fill +
+                    '%">' +
+                    '<span class="star-mini-slot-fg-inner">★</span></span></span>';
+            }
+            html += '</div>';
+            return html;
+        }
+        function statusPill(st) {
+            if (st === 'pending_review') return '<span class="status-pill st-pr">待客户评价</span>';
+            if (st === 'completed') return '<span class="status-pill st-done">已完成</span>';
+            if (st === 'servicing_requested') return '<span class="status-pill st-sr">售后处理中</span>';
+            if (st === 'servicing_completed') return '<span class="status-pill st-sc">售后已完成</span>';
+            return '<span class="status-pill">' + esc(st) + '</span>';
+        }
+
+        /** 与后端 reviews_only 列表筛选一致：rating、reviewContent 均非 null（对应库里的 content 非 null） */
+        function hasListedReview(it) {
+            return it.rating != null && it.reviewContent != null;
+        }
+
+        function getRole() {
+            try {
+                var b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+                return JSON.parse(decodeURIComponent(escape(atob(b64)))).role || '';
+            } catch (e) { return ''; }
+        }
+
+        var backLink = document.getElementById('backLink');
+        if (embed) backLink.href = 'profile.html?embed=1';
+
+        if (!token || getRole() !== 'consultant') {
+            window.location.href = 'login.html';
+        } else {
+            document.getElementById('pageTitle').textContent =
+                filter === 'all' ? '我的订单与评价' : '客户评价';
+            document.getElementById('subHint').textContent =
+                filter === 'all'
+                    ? '与后台一致：含「待客户评价」「已完成」「售后处理中」「售后已完成」四类订单；每条显示订单完成时间，有评价时另显示评价时间。'
+                    : '仅展示列表接口认定为「有评价」的订单（与后台筛选条件一致）。若资料页评价数大于 0 但此处为空，请看下方说明。';
+
+            (async function () {
+                var wrap = document.getElementById('listWrap');
+                try {
+                    var url =
+                        filter === 'all'
+                            ? API + '/api/reviews/consultant/orders-review-feed?filter=all'
+                            : API + '/api/reviews/consultant/reviews-review-feed';
+                    var res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+                    var j = await res.json();
+                    if (res.status === 401 || res.status === 403) {
+                        localStorage.removeItem('token');
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    if (!res.ok) {
+                        wrap.innerHTML = '<p class="empty err">' + esc(j.message || '加载失败') + '</p>';
+                        return;
+                    }
+                    var list = (j.data && j.data.list) || [];
+                    if (list.length === 0) {
+                        wrap.innerHTML =
+                            '<p class="empty">' +
+                            (filter === 'all'
+                                ? '暂无相关订单'
+                                : '暂无评价') +
+                            '</p>' +
+                            (filter === 'reviews_only'
+                                ? '<p class="empty" style="font-size:12px;line-height:1.6;margin-top:-12px;opacity:0.85">说明：资料里的「评价数」来自顾问资料表累加；列表接口只返回同时满足评分、评价文字、评价时间均在库中非空的记录。若客户只打星未写文字，评价数会增加但此处不会有条目。</p>'
+                                : '');
+                        return;
+                    }
+                    wrap.innerHTML = list.map(function (it) {
+                        var hasRev = hasListedReview(it);
+                        var custName = (it.name != null && String(it.name).trim()) ? String(it.name).trim() : '';
+                        var custSpan =
+                            custName || it.userId != null
+                                ? '<span class="cust">' +
+                                  (custName ? '客户 ' + esc(custName) : '用户 #' + esc(String(it.userId))) +
+                                  '</span>'
+                                : '';
+                        var revBlock = hasRev
+                            ? '<div class="block-label">客户评价</div><div class="rev-row">' +
+                              starHtml(it.rating) +
+                              '<span class="rev-score">' + esc(Number(it.rating).toFixed(1)) + '</span><span style="font-size:12px;color:#888">/ 5</span></div>' +
+                              (String(it.reviewContent).trim()
+                                  ? '<div class="rev-text">' + esc(it.reviewContent) + '</div>'
+                                  : '<div class="rev-text" style="color:#999">（无文字）</div>')
+                            : '<div class="block-label">客户评价</div><p class="rev-wait">客户尚未评价（或评价未进入列表条件）</p>';
+                        var timeBlock =
+                            '<div class="block-label">时间</div>' +
+                            '<div class="meta-time">订单完成：' + esc(formatDateTime(it.completedAt)) + '</div>' +
+                            (hasRev ? '<div class="meta-time">评价时间：' + esc(formatDateTime(it.reviewedAt)) + '</div>' : '');
+                        return '<div class="card">' +
+                            '<div class="card-head">' +
+                            '<span class="oid">订单 #' + esc(String(it.orderId)) + '</span>' +
+                            custSpan +
+                            statusPill(it.orderStatus) +
+                            '<div class="stype">' + esc(it.serviceType || '—') + '</div>' +
+                            '</div>' +
+                            '<div class="block-label">客户需求</div>' +
+                            '<div class="demand">' + esc(it.serviceContent || '—') + '</div>' +
+                            timeBlock +
+                            revBlock +
+                            '</div>';
+                    }).join('');
+                } catch (e) {
+                    wrap.innerHTML = '<p class="empty err">网络错误</p>';
+                }
+            })();
+        }
+    </script>
+</body>
+</html>

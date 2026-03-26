@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>申请售后</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+            background: linear-gradient(165deg, #1a1a2e, #16213e);
+            padding: 24px 16px;
+            color: #fff;
+        }
+        .card {
+            max-width: 420px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px 20px 28px;
+            color: #333;
+        }
+        h1 { margin: 0 0 8px; font-size: 20px; text-align: center; }
+        .sub { text-align: center; font-size: 13px; color: #888; margin-bottom: 18px; }
+        .order-brief {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            padding: 12px;
+            background: #f7f8fa;
+            border-radius: 10px;
+        }
+        .label { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; }
+        select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: inherit;
+        }
+        select { margin-bottom: 16px; background: #fff; }
+        textarea { min-height: 120px; resize: vertical; }
+        .char-hint { font-size: 12px; color: #999; margin-top: 6px; text-align: right; }
+        .btn {
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            background: linear-gradient(135deg, #722ed1, #531dab);
+            color: #fff;
+        }
+        .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+        .err { color: #cf1322; text-align: center; font-size: 14px; margin-top: 12px; }
+        .back {
+            display: block;
+            text-align: center;
+            margin-top: 18px;
+            color: rgba(255, 255, 255, 0.88);
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: underline;
+            border: none;
+            background: none;
+            width: 100%;
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+    <div class="card" id="main">
+        <h1>申请售后</h1>
+        <p class="sub">「待评价」或「已完成」且未申请过售后的订单可申请；提交后金币将按订单金额退回（以后台处理为准）</p>
+        <div class="order-brief" id="brief">加载订单信息…</div>
+        <div class="label">售后原因类型</div>
+        <select id="reasonType" aria-label="售后原因类型"></select>
+        <div class="label">情况说明（选填，最多 200 字）</div>
+        <textarea id="content" maxlength="200" placeholder="请简要说明问题…"></textarea>
+        <p class="char-hint"><span id="charCount">0</span> / 200</p>
+        <button type="button" class="btn" id="btnSubmit">提交售后申请</button>
+        <p class="err" id="err"></p>
+    </div>
+    <button type="button" class="back" id="btnBack">返回我的订单</button>
+    <script src="js/embed-parent-nav.js"></script>
+    <script>
+        var API = window.location.origin;
+        var token = localStorage.getItem('token');
+        var params = new URLSearchParams(location.search);
+        var orderId = parseInt(params.get('orderId'), 10);
+        var DASH_EMBED = params.get('embed') === '1';
+        var returnPanel = params.get('returnPanel') || 'slot2';
+
+        /** 与 fund_transactions.servicing_reason_type 枚举一致（去重） */
+        var SERVICING_REASONS = [
+            '服务不满意',
+            '服务不及时',
+            '服务不专业',
+            '服务不热情',
+            '服务不耐心',
+            '服务不周到',
+            '服务不规范',
+            '服务不标准',
+            '服务不一致'
+        ];
+
+        var SERVICING_DONE_KEY = 'user_order_after_sale_done';
+
+        var ORDER_STATUS_ZH = {
+            pending: '待支付/待接单',
+            pending_rush: '加急待接单',
+            accepted: '已接单',
+            start_invited: '待确认开始',
+            in_service: '服务中',
+            pending_review: '待评价',
+            completed: '已完成',
+            cancelled: '已取消',
+            expired: '已过期',
+            servicing_requested: '售后处理中',
+            servicing_completed: '售后已完成'
+        };
+
+        function getServicingDoneMap() {
+            try {
+                var raw = localStorage.getItem(SERVICING_DONE_KEY);
+                var o = raw ? JSON.parse(raw) : {};
+                return o && typeof o === 'object' ? o : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function markServicingDone(id) {
+            var m = getServicingDoneMap();
+            m[String(id)] = true;
+            localStorage.setItem(SERVICING_DONE_KEY, JSON.stringify(m));
+        }
+
+        function goOrders() {
+            var u = 'my-orders.html';
+            if (DASH_EMBED) u += '?embed=1&returnPanel=' + encodeURIComponent(returnPanel);
+            try {
+                if (window.top !== window) window.top.location.href = u;
+                else location.href = u;
+            } catch (e) {
+                location.href = u;
+            }
+        }
+
+        function goDashboardPanel(panel) {
+            var u = new URL('dashboard.html', location.href);
+            u.searchParams.set('panel', panel);
+            try {
+                if (window.top !== window) window.top.location.href = u.href;
+                else location.href = u.href;
+            } catch (e) {
+                location.href = u.href;
+            }
+        }
+
+        document.getElementById('btnBack').onclick = function () {
+            if (DASH_EMBED) goDashboardPanel(returnPanel);
+            else goOrders();
+        };
+
+        var sel = document.getElementById('reasonType');
+        SERVICING_REASONS.forEach(function (r) {
+            var opt = document.createElement('option');
+            opt.value = r;
+            opt.textContent = r;
+            sel.appendChild(opt);
+        });
+
+        var ta = document.getElementById('content');
+        var charCount = document.getElementById('charCount');
+        ta.addEventListener('input', function () {
+            charCount.textContent = String(ta.value.length);
+        });
+
+        function getRole() {
+            try {
+                return JSON.parse(
+                    decodeURIComponent(escape(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))
+                ).role;
+            } catch (e) {
+                return '';
+            }
+        }
+
+        if (!token || getRole() !== 'user') {
+            location.href = 'login.html';
+        } else if (!orderId) {
+            document.getElementById('brief').textContent = '缺少订单号';
+            document.getElementById('btnSubmit').disabled = true;
+        } else {
+            (async function () {
+                var brief = document.getElementById('brief');
+                try {
+                    var res = await fetch(API + '/api/order/detail/' + orderId, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    var j = await res.json();
+                    if (!res.ok) {
+                        brief.textContent = j.message || '加载失败';
+                        document.getElementById('btnSubmit').disabled = true;
+                        return;
+                    }
+                    var d = j.data || {};
+                    if (d.status !== 'completed' && d.status !== 'pending_review') {
+                        brief.textContent =
+                            '仅「待评价」或「已完成」订单可申请售后，当前状态：' +
+                            (ORDER_STATUS_ZH[d.status] || d.status || '--');
+                        document.getElementById('btnSubmit').disabled = true;
+                        return;
+                    }
+                    if (getServicingDoneMap()[String(orderId)]) {
+                        brief.innerHTML =
+                            '<strong>该订单已在本设备记录为售后完成</strong>，无需重复申请。';
+                        document.getElementById('btnSubmit').disabled = true;
+                        return;
+                    }
+                    brief.innerHTML =
+                        '<strong>订单 #' +
+                        d.orderId +
+                        '</strong><br>顾问：' +
+                        (d.consultantName || '顾问 #' + d.consultantId) +
+                        '<br>服务：' +
+                        (d.serviceType || '--') +
+                        '<br>金额：<strong>' +
+                        (d.price != null ? Number(d.price).toFixed(2) : '--') +
+                        '</strong> 金币';
+                } catch (e) {
+                    brief.textContent = '网络错误';
+                    document.getElementById('btnSubmit').disabled = true;
+                }
+            })();
+
+            document.getElementById('btnSubmit').onclick = async function () {
+                var errEl = document.getElementById('err');
+                errEl.textContent = '';
+                var btn = document.getElementById('btnSubmit');
+                var typeVal = sel.value;
+                if (!typeVal) {
+                    errEl.textContent = '请选择售后原因类型';
+                    return;
+                }
+                var content = ta.value.trim();
+                if (content.length > 200) {
+                    errEl.textContent = '说明须在 200 字以内';
+                    return;
+                }
+                btn.disabled = true;
+                try {
+                    var res = await fetch(API + '/api/order/' + orderId + '/servicing', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + token
+                        },
+                        body: JSON.stringify({
+                            servicingReasonType: typeVal,
+                            content: content || null
+                        })
+                    });
+                    var data = await res.json().catch(function () {
+                        return {};
+                    });
+                    if (res.status === 401 || res.status === 403) {
+                        localStorage.removeItem('token');
+                        location.href = 'login.html';
+                        return;
+                    }
+                    if (!res.ok) {
+                        errEl.textContent = data.message || '提交失败';
+                        btn.disabled = false;
+                        return;
+                    }
+                    markServicingDone(orderId);
+                    alert(data.message || '售后申请已提交');
+                    if (DASH_EMBED) goDashboardPanel(returnPanel);
+                    else goOrders();
+                } catch (e) {
+                    errEl.textContent = '网络错误';
+                    btn.disabled = false;
+                }
+            };
+        }
+
+    </script>
+</body>
+</html>

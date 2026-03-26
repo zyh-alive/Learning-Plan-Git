@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提现金币</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+            background: linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            padding: 20px 16px 40px;
+        }
+        .back { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 15px; display: inline-block; margin-bottom: 20px; }
+        .balance-hero {
+            border-radius: 20px;
+            padding: 24px;
+            background: linear-gradient(135deg, #ff9a56 0%, #ff6b3d 100%);
+            text-align: center;
+            max-width: 400px;
+            margin: 0 auto 24px;
+            box-shadow: 0 12px 40px rgba(255, 107, 61, 0.35);
+        }
+        .balance-hero .label { font-size: 13px; color: rgba(0,0,0,0.5); font-weight: 600; }
+        .balance-hero .amount { font-size: 36px; font-weight: 800; color: #1a1a1a; margin-top: 6px; }
+        .card {
+            max-width: 400px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        }
+        .card h2 { margin: 0 0 16px; font-size: 18px; color: #333; }
+        .quick {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .quick button {
+            flex: 1;
+            min-width: 72px;
+            padding: 12px;
+            border: 2px solid #e8e8e8;
+            border-radius: 10px;
+            background: #fafafa;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            cursor: pointer;
+        }
+        .quick button:hover, .quick button.active { border-color: #ff6b3d; background: #fff5f0; color: #d4380d; }
+        .field label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
+        .field input {
+            width: 100%;
+            height: 48px;
+            padding: 0 14px;
+            font-size: 18px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+        }
+        .field input:focus { outline: none; border-color: #ff6b3d; }
+        .hint { font-size: 12px; color: #999; margin-top: 8px; line-height: 1.5; }
+        .submit {
+            width: 100%;
+            height: 50px;
+            margin-top: 24px;
+            font-size: 17px;
+            font-weight: 600;
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #ff9a56, #ff4d4f);
+            cursor: pointer;
+        }
+        .submit:disabled { opacity: 0.6; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <a class="back" href="coin-wallet.html" id="backWallet">← 返回金币中心</a>
+    <div class="balance-hero">
+        <div class="label">可提现余额</div>
+        <div class="amount" id="bal">--</div>
+    </div>
+    <div class="card">
+        <h2>提现金额</h2>
+        <div class="quick" id="quickRow">
+            <button type="button" data-a="50">50</button>
+            <button type="button" data-a="100">100</button>
+            <button type="button" data-a="200">200</button>
+            <button type="button" data-a="500">500</button>
+        </div>
+        <div class="field">
+            <label for="amount">自定义金额（1～10000，不超过当前余额）</label>
+            <input type="number" id="amount" min="1" max="10000" step="1" placeholder="输入金币数量">
+        </div>
+        <p class="hint" id="hintText">提现申请提交后将从账户扣除相应金币并记入提现记录（演示环境即时到账）。</p>
+        <button type="button" class="submit" id="btn">确认提现</button>
+    </div>
+    <script>
+        var API = window.location.origin;
+        var token = localStorage.getItem('token');
+        var currentCoin = 0;
+        function formatCoin(v) {
+            if (v == null || v === '') return '0.00';
+            var n = Number(v);
+            if (!Number.isFinite(n)) return '0.00';
+            return n.toFixed(2);
+        }
+        function getRole() {
+            try {
+                var b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+                var p = JSON.parse(decodeURIComponent(escape(atob(b64))));
+                if (p.role) return p.role;
+            } catch (e) {}
+            return 'user';
+        }
+        var role = String(getRole() || 'user').toLowerCase();
+        if (!token) location.href = 'login.html';
+        else if (role !== 'user' && role !== 'consultant') location.href = 'dashboard.html';
+        var embedQs = new URLSearchParams(window.location.search).get('embed') === '1' ? '?embed=1' : '';
+        if (embedQs) document.getElementById('backWallet').href = 'coin-wallet.html' + embedQs;
+
+        function loadBal() {
+            fetch(API + '/api/transaction/withdraw/balance', { headers: { 'Authorization': 'Bearer ' + token } })
+                .then(function (r) { return r.json().then(function (d) { return { r: r, d: d }; }); })
+                .then(function (x) {
+                    if (!x.r.ok) return;
+                    var c = x.d.data && x.d.data.coin;
+                    currentCoin = c != null ? Number(c) : 0;
+                    document.getElementById('bal').textContent = formatCoin(currentCoin);
+                });
+        }
+        loadBal();
+
+        document.querySelectorAll('.quick button').forEach(function (b) {
+            b.addEventListener('click', function () {
+                document.querySelectorAll('.quick button').forEach(function (x) { x.classList.remove('active'); });
+                b.classList.add('active');
+                var cap = Math.min(10000, Math.max(0, currentCoin));
+                var want = parseInt(b.getAttribute('data-a'), 10);
+                document.getElementById('amount').value = String(Math.min(want, cap) || (cap > 0 ? cap : ''));
+            });
+        });
+
+        var submitting = false;
+        document.getElementById('btn').addEventListener('click', async function () {
+            if (submitting) return;
+            var n = parseInt(document.getElementById('amount').value, 10);
+            if (!n || n <= 0 || n > 10000) {
+                alert('请输入 1～10000 之间的整数金额');
+                return;
+            }
+            if (n > currentCoin) {
+                alert('提现金额不能超过当前余额（' + formatCoin(currentCoin) + '）');
+                return;
+            }
+            submitting = true;
+            var btn = document.getElementById('btn');
+            btn.disabled = true;
+            btn.textContent = '处理中…';
+            try {
+                var res = await fetch(API + '/api/transaction/withdraw', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ transactionAmount: n })
+                });
+                var data = await res.json();
+                if (res.status === 401 || res.status === 403) {
+                    localStorage.removeItem('token');
+                    location.href = 'login.html';
+                    return;
+                }
+                if (!res.ok) {
+                    alert(data.message || '提现失败');
+                    return;
+                }
+                var nb = data.data && (data.data.newBalance != null ? data.data.newBalance
+                    : (data.data.customerBalanceAfter != null ? data.data.customerBalanceAfter : data.data.consultantBalanceAfter));
+                currentCoin = nb != null ? Number(nb) : Math.max(0, currentCoin - n);
+                document.getElementById('bal').textContent = formatCoin(currentCoin);
+                alert('提现成功！当前余额：' + formatCoin(nb != null ? nb : currentCoin));
+                document.getElementById('amount').value = '';
+                document.querySelectorAll('.quick button').forEach(function (x) { x.classList.remove('active'); });
+            } catch (e) {
+                alert('网络错误');
+            } finally {
+                submitting = false;
+                btn.disabled = false;
+                btn.textContent = '确认提现';
+            }
+        });
+    </script>
+</body>
+</html>
