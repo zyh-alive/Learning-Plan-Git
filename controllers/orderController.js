@@ -1506,3 +1506,66 @@ exports.payRushOrder = async (req, res) => {
         res.status(500).json({ message: '服务器错误' });
     }
 };
+
+//查出订单列表中所有待处理的订单，并返回给前端
+async function getPendingOrders() {
+    try {
+        const orders = await Order.findAll({
+            where: { status: { [Op.in]: ['pending', 'accepted', 'pending_rush'] } },
+            attributes: [  'consultantId','status','orderId']
+        });//orders是一个数组，包含所有待处理的订单
+        const consultantNames = await ConsultantProfile.findAll({
+            where: { consultantId: { [Op.in]: orders.map(order => order.consultantId) } },
+            attributes: [ 'consultantId','name']
+        });//consultantNames是一个数组，包含所有顾问的姓名
+        const nameMap = {};//创建一个对象，用于存储用户ID和用户姓名
+        for (const consultant of consultantNames) {
+            nameMap[consultant.consultantId] = consultant.name;
+        }
+        console.log('nameMap是:',nameMap);
+        /*const list = orders.map((o) => {
+            //o：订单信息
+            const name = nameMap[o.consultantId];
+            const item = {//item：订单评价信息
+                name: name,
+                consultantId: o.consultantId,//顾问ID
+                orderId: o.orderId,//订单ID
+                status: o.status,//订单状态
+            };//返回订单信息
+            return item;
+        });//list是一个数组，包含所有待处理的订单信息*/
+        /*console.log('list是:',list);*/
+
+        //不用先合并再遍历，可以直接遍历orders数组，直接获取顾问ID和订单状态
+        const status = {}//status是一个对象，用于存储所有顾问的订单统计信息
+        for (const item of orders) {
+            const consultantId = item.consultantId;//顾问ID
+            if (!status[consultantId]) {
+                status[consultantId] = {
+                    name: nameMap[consultantId] || `顾问${consultantId}`, 
+                    total: 0,
+                    pending: 0,
+                    pending_rush: 0,
+                    accepted: 0,
+                };
+            }
+            status[consultantId].total++;
+            if (item.status === 'pending') status[consultantId].pending++;//typeof(status[consultantId].pending)：number
+            if (item.status === 'pending_rush') status[consultantId].pending_rush++;
+            if (item.status === 'accepted') status[consultantId].accepted++;
+        }//牛逼的写法，consultantid是键，{}内是值
+        /*const message =`
+        顾问：${nameMap[orders[0].consultantId]}
+        待处理订单：${countOrders}个
+        待接单订单：${countOrdersPending}个
+        加急待接单订单：${countOrdersPendingRush}个
+        已接单待服务订单：${countOrdersAccepted}个
+        `;*/
+        console.log('status是:',status);
+        return { status: status };
+    } catch (err) {
+        console.error('获取待处理订单错误:', err);
+        return { error: '服务器错误' };
+    }
+}
+exports.getPendingOrders = getPendingOrders;

@@ -6,7 +6,7 @@ async function processes(token) {
         let res = await fetch(BASE + '/api/order/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-            body: JSON.stringify({ consultantId: 1704, serviceType: '咨询', serviceContent: '咨询内容' })
+            body: JSON.stringify({ consultantId:  30002, serviceType: '咨询', serviceContent: '咨询内容' })
         });
         if (!res.ok) return {token,success: false,error: res.statusText};
         const time = Date.now() - start;
@@ -18,7 +18,7 @@ async function processes(token) {
 
 async function test() {
     const promises = [];
-    const total = 10000; 
+    const total = 5; 
     for (let i = 0; i < total; i++) {
         const phone = `132000${String(i+11110).padStart(5, '0')}`;
         //$是拼接字符串的符号，手机号是11位，所以需要用padStart方法补齐4位，用0补齐

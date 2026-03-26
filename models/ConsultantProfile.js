@@ -63,6 +63,13 @@ const ConsultantProfile = sequelize.define('ConsultantProfile', {
         type: DataTypes.INTEGER,
         defaultValue: 0,
         comment: 'token版本号，改密码+1'
+    },
+    //顾问时区，类型字符串，24个时区
+    timezone: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        defaultValue: 'Asia/Shanghai',
+        comment: '顾问时区，默认东八区 Asia/Shanghai'
     }
 }, {
     tableName: 'consultant_profile',
