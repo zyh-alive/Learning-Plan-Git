@@ -3,7 +3,8 @@
 
 const roleConfig = require('../config/roleConfig');
 const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('../utils/verifyAccessToken');
+const config = require('../config');
+const JWT_SECRET = config.jwt.secret;
 const CODE_EXPIRE_MS = 5 * 60 * 1000;
 const VERIFIED_EXPIRE_MS = 5 * 60 * 1000; // 验证通过后 5 分钟内要设置密码
 const Order = require('../models/Order');
@@ -156,7 +157,7 @@ exports.setPassword = async (req, res) => {
         const token = jwt.sign(
             { [idKey]: auth.id, phone: auth.phone, role, token_version: (profile && profile.token_version != null) ? profile.token_version : 0 },
             JWT_SECRET,
-            { expiresIn: '2h' }
+            { expiresIn: config.jwt.expiresIn }
         );
         //两小时过期，过期后需要重新登录
         res.status(201).json({
@@ -193,7 +194,7 @@ exports.login = async (req, res) => {
         const token = jwt.sign(
             { [idKey]: auth.id, phone: auth.phone, role, token_version: ver },
             JWT_SECRET,
-            { expiresIn: '2h' }
+            { expiresIn: config.jwt.expiresIn }
         );
         res.json({
             message: '登录成功',

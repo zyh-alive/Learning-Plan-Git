@@ -56,6 +56,13 @@ app.get('/', (req, res) => {
 (async () => {
     const syncOpts = process.env.SEQUELIZE_SYNC_ALTER === '1' ? { alter: true } : {};
     await sequelize.sync(syncOpts);
+    try {
+        await sequelize.authenticate();
+        console.log('✅ 数据库连接成功');
+    } catch (error) {
+        console.error('❌ 数据库连接失败：', error);
+        process.exit(1);
+    }
     const PORT = 3003;
     const server = http.createServer(app);
     setupWebSockets(server);

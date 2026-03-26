@@ -5,8 +5,9 @@
  */
 const jwt = require('jsonwebtoken');
 const roleConfig = require('../config/roleConfig');
+const config = require('../config');
 
-const JWT_SECRET = 'my-secret-key-123';
+const JWT_SECRET = config.jwt.secret;
 
 /**
  * 校验 Bearer 同款的 JWT 字符串：验签 + Profile.token_version 与 payload 一致。

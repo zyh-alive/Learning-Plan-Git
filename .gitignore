@@ -6,6 +6,9 @@ package-lock.json
 .env
 .env.local
 
+# 配置文件（敏感/本地）
+config/config.yaml
+
 # 日志
 *.log
 
@@ -19,3 +22,9 @@ Thumbs.db
 
 # 临时文件
 *.tmp
+*.temp
+
+# 构建产物
+dist/
+build/
+coverage/
