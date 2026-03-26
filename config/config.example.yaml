@@ -24,3 +24,6 @@ jwt:
 logging:
   level: info                   # 日志级别：debug, info, warn, error
   sql: true                     # 是否打印 SQL 语句（开发时 true，生产时 false）
+
+feishu:
+  botWebhook: ${FEISHU_BOT_WEBHOOK} # 飞书群机器人webhook
