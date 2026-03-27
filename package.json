@@ -6,7 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "db:migrate": "sequelize-cli db:migrate --config config/config.js",
+    "db:migrate:undo": "sequelize-cli db:migrate:undo --config config/config.js",
+    "db:migrate:status": "sequelize-cli db:migrate:status --config config/config.js"
   },
   "keywords": [],
   "author": "zyh",

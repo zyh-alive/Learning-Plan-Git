@@ -28,3 +28,6 @@ Thumbs.db
 dist/
 build/
 coverage/
+
+# migrations配置文件
+config/config.json

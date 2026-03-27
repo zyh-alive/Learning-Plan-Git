@@ -1542,7 +1542,7 @@ async function getPendingOrders(options = {}) {
                 consultantsInTimezone.push({
                     consultantId: id,
                     name: p.name != null ? String(p.name).trim() || null : null
-                });
+                });//添加所有顾问的返回
             }
             if (allowedConsultantIds.size === 0) {
                 return { status: {}, timezone: targetTz, consultants: [] };
@@ -1596,7 +1596,7 @@ async function getPendingOrders(options = {}) {
         console.log('status是:', status);
         const out = { status };
         if (targetTz) {
-            out.timezone = targetTz;
+            out.timezone = targetTz;//添加时区的返回
             out.consultants = consultantsInTimezone;
         }
         return out;

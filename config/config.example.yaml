@@ -1,18 +1,6 @@
 # config/config.example.yaml
-# 复制此文件为 config.yaml，并修改为你的真实配置
-
-database:
-  name: your_database_name      # 改成你的数据库名，例如：testdb3
-  user: your_database_user      # 改成你的数据库用户名，例如：root
-  password: ${DB_PASSWORD}      # 在 .env 文件里设置 DB_PASSWORD
-  host: localhost               # 数据库地址
-  port: 3306                    # MySQL 默认端口
-  dialect: mysql                # 数据库类型
-  pool:
-    max: 5                      # 最大连接数
-    min: 0                      # 最小连接数
-    acquire: 30000              # 获取连接超时（毫秒）
-    idle: 10000                 # 空闲连接超时（毫秒）
+# 复制为 config.yaml：仅业务配置（端口、JWT、日志、飞书等）。
+# 数据库连接仅写在 config/config.json（可复制 config.example.json），由 config/index.js 与 sequelize-cli 共用。
 
 server:
   port: your_port               # 服务器端口
@@ -27,6 +15,6 @@ logging:
 
 feishu:
   botWebhook: ${FEISHU_BOT_WEBHOOK} # 飞书群机器人webhook
-  enableMorningBrief: ${ENABLE_FEISHU_MORNING} # 1 开启早间播报（见 external_call/scheduledNotifications.js）
-  morningHour: ${FEISHU_MORNING_HOUR} # 飞书早间播报小时（未在 .env 设置时由代码默认 8）
-  morningMinute: ${FEISHU_MORNING_MINUTE} # 飞书早间播报分钟（未设置时默认 0）
+  enableMorningBrief: ${ENABLE_FEISHU_MORNING} # 1 开启早间播报
+  morningHour: ${FEISHU_MORNING_HOUR}
+  morningMinute: ${FEISHU_MORNING_MINUTE}
