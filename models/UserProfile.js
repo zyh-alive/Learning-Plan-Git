@@ -40,6 +40,13 @@ const UserProfile = sequelize.define('UserProfile', {
         type: DataTypes.INTEGER,
         defaultValue: 0,
         comment: 'token版本号，改密码+1'
+    },
+    //顾客时区，类型字符串，24个时区
+    timezone: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        defaultValue: 'Asia/Shanghai',
+        comment: '顾客时区，默认东八区 Asia/Shanghai'
     }
 }, {
     tableName: 'user_profile',

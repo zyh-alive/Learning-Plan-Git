@@ -15,7 +15,7 @@ database:
     idle: 10000                 # 空闲连接超时（毫秒）
 
 server:
-  port: 3003                    # 服务器端口
+  port: your_port               # 服务器端口
 
 jwt:
   secret: ${JWT_SECRET}         # 在 .env 文件里设置 JWT_SECRET
@@ -27,3 +27,6 @@ logging:
 
 feishu:
   botWebhook: ${FEISHU_BOT_WEBHOOK} # 飞书群机器人webhook
+  enableMorningBrief: ${ENABLE_FEISHU_MORNING} # 1 开启早间播报（见 external_call/scheduledNotifications.js）
+  morningHour: ${FEISHU_MORNING_HOUR} # 飞书早间播报小时（未在 .env 设置时由代码默认 8）
+  morningMinute: ${FEISHU_MORNING_MINUTE} # 飞书早间播报分钟（未设置时默认 0）

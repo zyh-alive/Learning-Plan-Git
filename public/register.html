@@ -367,7 +367,12 @@
                 var res = await fetch(API_BASE + '/auth/set-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone: currentPhone, password: password, role: role })
+                    body: JSON.stringify({
+                        phone: currentPhone,
+                        password: password,
+                        role: role,
+                        timezone: getTimezone()
+                    })
                 });
                 var data = await res.json();
                 var setTime = Date.now() - startTime3;
@@ -391,6 +396,15 @@
                 btn.textContent = '完成注册并进入';
             }
         });
+
+        /** 浏览器 IANA 时区，如 Asia/Shanghai；与 set-password 一并写入 user_profile / consultant_profile.timezone */
+        function getTimezone() {
+            try {
+                return Intl.DateTimeFormat().resolvedOptions().timeZone;//
+            } catch (e) {
+                return 'Asia/Shanghai';
+            }
+        }
     </script>
 </body>
 </html>

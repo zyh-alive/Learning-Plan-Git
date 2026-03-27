@@ -9,6 +9,7 @@
 // 金币：支付时扣用户、写 frozen；完成时写 released、加顾问；取消/过期/拒绝时写 refunded、退用户
 //
 const { Op } = require('sequelize');
+const moment = require('moment-timezone');
 const Order = require('../models/Order');
 const ConsultantProfile = require('../models/ConsultantProfile');
 const ConsultantService = require('../models/ConsultantService');
@@ -1507,62 +1508,98 @@ exports.payRushOrder = async (req, res) => {
     }
 };
 
-//查出订单列表中所有待处理的订单，并返回给前端
-async function getPendingOrders() {
+/** 与顾问资料、早间播报一致：空/无效时区视为东八区 */
+const PROFILE_TIMEZONE_DEFAULT = 'Asia/Shanghai';
+
+function normalizeConsultantProfileTimezone(raw) {
+    const s = raw != null && String(raw).trim() ? String(raw).trim() : PROFILE_TIMEZONE_DEFAULT;
+    return moment.tz.zone(s) ? s : PROFILE_TIMEZONE_DEFAULT;
+}
+
+/**
+ * 待处理订单按顾问聚合统计。
+ * @param {{ timezone?: string }} [options] 传入 IANA 时区（如 Asia/Shanghai）则只统计 consultant_profile 归为该时区的顾问；不传则全库顾问（原行为）。
+ */
+async function getPendingOrders(options = {}) {
     try {
+        const tzArg =
+            options.timezone != null && String(options.timezone).trim() ? String(options.timezone).trim() : null;
+        const targetTz = tzArg ? normalizeConsultantProfileTimezone(tzArg) : null;
+
+        let allowedConsultantIds = null;
+        /** @type {{ consultantId: number, name: string|null }[]} */
+        let consultantsInTimezone = [];
+
+        if (targetTz) {
+            const profiles = await ConsultantProfile.findAll({
+                attributes: ['consultantId', 'name', 'timezone']
+            });
+            allowedConsultantIds = new Set();
+            for (const p of profiles) {
+                if (normalizeConsultantProfileTimezone(p.timezone) !== targetTz) continue;
+                const id = Number(p.consultantId);
+                allowedConsultantIds.add(id);
+                consultantsInTimezone.push({
+                    consultantId: id,
+                    name: p.name != null ? String(p.name).trim() || null : null
+                });
+            }
+            if (allowedConsultantIds.size === 0) {
+                return { status: {}, timezone: targetTz, consultants: [] };
+            }
+        }
+
+        const orderWhere = {
+            status: { [Op.in]: ['pending', 'accepted', 'pending_rush'] }
+        };
+        if (allowedConsultantIds) {
+            orderWhere.consultantId = { [Op.in]: [...allowedConsultantIds] };
+        }
+
         const orders = await Order.findAll({
-            where: { status: { [Op.in]: ['pending', 'accepted', 'pending_rush'] } },
-            attributes: [  'consultantId','status','orderId']
-        });//orders是一个数组，包含所有待处理的订单
-        const consultantNames = await ConsultantProfile.findAll({
-            where: { consultantId: { [Op.in]: orders.map(order => order.consultantId) } },
-            attributes: [ 'consultantId','name']
-        });//consultantNames是一个数组，包含所有顾问的姓名
-        const nameMap = {};//创建一个对象，用于存储用户ID和用户姓名
+            where: orderWhere,
+            attributes: ['consultantId', 'status', 'orderId']
+        });
+
+        const idList = [...new Set(orders.map((o) => o.consultantId).filter((id) => id != null))];
+        const consultantNames =
+            idList.length > 0
+                ? await ConsultantProfile.findAll({
+                      where: { consultantId: { [Op.in]: idList } },
+                      attributes: ['consultantId', 'name']
+                  })
+                : [];
+        const nameMap = {};
         for (const consultant of consultantNames) {
             nameMap[consultant.consultantId] = consultant.name;
         }
-        console.log('nameMap是:',nameMap);
-        /*const list = orders.map((o) => {
-            //o：订单信息
-            const name = nameMap[o.consultantId];
-            const item = {//item：订单评价信息
-                name: name,
-                consultantId: o.consultantId,//顾问ID
-                orderId: o.orderId,//订单ID
-                status: o.status,//订单状态
-            };//返回订单信息
-            return item;
-        });//list是一个数组，包含所有待处理的订单信息*/
-        /*console.log('list是:',list);*/
+        console.log('nameMap是:', nameMap);
 
-        //不用先合并再遍历，可以直接遍历orders数组，直接获取顾问ID和订单状态
-        const status = {}//status是一个对象，用于存储所有顾问的订单统计信息
+        const status = {};
         for (const item of orders) {
-            const consultantId = item.consultantId;//顾问ID
+            const consultantId = item.consultantId;
+            if (consultantId == null) continue;
             if (!status[consultantId]) {
                 status[consultantId] = {
-                    name: nameMap[consultantId] || `顾问${consultantId}`, 
+                    name: nameMap[consultantId] || `顾问${consultantId}`,
                     total: 0,
                     pending: 0,
                     pending_rush: 0,
-                    accepted: 0,
+                    accepted: 0
                 };
             }
             status[consultantId].total++;
-            if (item.status === 'pending') status[consultantId].pending++;//typeof(status[consultantId].pending)：number
+            if (item.status === 'pending') status[consultantId].pending++;
             if (item.status === 'pending_rush') status[consultantId].pending_rush++;
             if (item.status === 'accepted') status[consultantId].accepted++;
-        }//牛逼的写法，consultantid是键，{}内是值
-        /*const message =`
-        顾问：${nameMap[orders[0].consultantId]}
-        待处理订单：${countOrders}个
-        待接单订单：${countOrdersPending}个
-        加急待接单订单：${countOrdersPendingRush}个
-        已接单待服务订单：${countOrdersAccepted}个
-        `;*/
-        console.log('status是:',status);
-        return { status: status };
+        }
+        console.log('status是:', status);
+        const out = { status };
+        if (targetTz) {
+            out.timezone = targetTz;
+            out.consultants = consultantsInTimezone;
+        }
+        return out;
     } catch (err) {
         console.error('获取待处理订单错误:', err);
         return { error: '服务器错误' };
