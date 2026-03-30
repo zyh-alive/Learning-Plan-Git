@@ -19,9 +19,9 @@ const FundTransaction = sequelize.define('FundTransaction', {
     },
     // 交易类型
     transactionType: {
-        type: DataTypes.ENUM('充值', '提现', '消费', '订单取消退款', '售后退款'),
+        type: DataTypes.ENUM('充值', '提现', '消费', '订单取消退款', '售后退款', '打赏'),
         allowNull: false,
-        comment: '交易类型'
+        comment: '交易类型充值，提现，消费，订单取消退款，售后退款，打赏'
     },
     // 交易金额
     transactionAmount: {

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打赏顾问</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+            background: linear-gradient(165deg, #1a1a2e, #16213e);
+            padding: 24px 16px;
+            color: #fff;
+        }
+        .card {
+            max-width: 420px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px 20px 28px;
+            color: #333;
+        }
+        h1 { margin: 0 0 8px; font-size: 20px; text-align: center; }
+        .sub { text-align: center; font-size: 13px; color: #888; margin-bottom: 20px; }
+        .order-brief { font-size: 14px; color: #555; line-height: 1.6; margin-bottom: 20px; padding: 12px; background: #f7f8fa; border-radius: 10px; }
+        .label { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; }
+        .coin-hint { font-size: 12px; color: #888; margin-bottom: 14px; }
+        input[type="number"] {
+            width: 100%;
+            padding: 14px 12px;
+            font-size: 18px;
+            border: 1px solid #d9d9d9;
+            border-radius: 10px;
+            font-family: inherit;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            margin-top: 18px;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            background: linear-gradient(135deg, #fa8c16, #d46b08);
+            color: #fff;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .err { color: #cf1322; text-align: center; font-size: 14px; margin-top: 12px; }
+        .back {
+            display: block;
+            text-align: center;
+            margin-top: 18px;
+            color: rgba(255,255,255,0.85);
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: underline;
+            border: none;
+            background: none;
+            width: 100%;
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+    <div class="card" id="main">
+        <h1>打赏顾问</h1>
+        <p class="sub">打赏金额从您的金币余额扣除，将计入顾问账户</p>
+        <div class="order-brief" id="brief">加载订单信息…</div>
+        <div class="label">打赏金额（金币）</div>
+        <p class="coin-hint" id="coinHint">当前余额：加载中…</p>
+        <input type="number" id="tipInput" min="0.01" step="0.01" placeholder="例如 5.00" inputmode="decimal" />
+        <button type="button" class="btn" id="btnSubmit">确认打赏</button>
+        <p class="err" id="err"></p>
+    </div>
+    <button type="button" class="back" id="btnBack">返回我的订单</button>
+    <script>
+        var API = window.location.origin;
+        var token = localStorage.getItem('token');
+        var params = new URLSearchParams(location.search);
+        var orderId = parseInt(params.get('orderId'), 10);
+        var returnPanel = params.get('returnPanel') || 'slot2';
+
+        function goDashboardPanel(panel) {
+            var u = new URL('dashboard.html', location.href);
+            u.searchParams.set('panel', panel);
+            var href = u.href;
+            try {
+                if (window.top !== window) window.top.location.href = href;
+                else window.location.href = href;
+            } catch (e) {
+                window.location.href = href;
+            }
+        }
+
+        document.getElementById('btnBack').onclick = function () {
+            goDashboardPanel(returnPanel);
+        };
+
+        function getRole() {
+            try {
+                return JSON.parse(decodeURIComponent(escape(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))).role;
+            } catch (e) { return ''; }
+        }
+
+        function canTipStatus(st) {
+            return st === 'pending_review' || st === 'completed';
+        }
+
+        if (!token || getRole() !== 'user') {
+            location.href = 'login.html';
+        } else if (!orderId) {
+            document.getElementById('brief').textContent = '缺少订单号';
+            document.getElementById('btnSubmit').disabled = true;
+        } else {
+            (async function () {
+                try {
+                    var res = await fetch(API + '/api/order/detail/' + orderId, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    var j = await res.json();
+                    if (!res.ok) {
+                        document.getElementById('brief').textContent = j.message || '加载失败';
+                        document.getElementById('btnSubmit').disabled = true;
+                        return;
+                    }
+                    var d = j.data || {};
+                    if (!canTipStatus(d.status)) {
+                        document.getElementById('brief').textContent =
+                            '当前订单状态为「' + (d.status || '--') + '」，仅「待评价」或「已完成」订单可打赏';
+                        document.getElementById('btnSubmit').disabled = true;
+                        return;
+                    }
+                    document.getElementById('brief').innerHTML =
+                        '<strong>订单 #' + d.orderId + '</strong><br>顾问：' +
+                        (d.consultantName || '顾问 #' + d.consultantId) +
+                        '<br>服务：' + (d.serviceType || '--');
+                    var pr = await fetch(API + '/auth/profile', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    var pj = await pr.json().catch(function () { return {}; });
+                    var uid = pr.ok && pj.user && (pj.user.userId != null || pj.user.id != null)
+                        ? Number(pj.user.userId != null ? pj.user.userId : pj.user.id)
+                        : null;
+                    var coin = null;
+                    if (uid != null) {
+                        var ur = await fetch(API + '/auth/users/' + uid, {
+                            headers: { 'Authorization': 'Bearer ' + token }
+                        });
+                        var uj = await ur.json().catch(function () { return {}; });
+                        if (ur.ok && uj.user && uj.user.coin != null) coin = Number(uj.user.coin);
+                    }
+                    document.getElementById('coinHint').textContent =
+                        coin != null && !isNaN(coin)
+                            ? '当前余额：' + coin.toFixed(2) + ' 金币'
+                            : '当前余额：加载失败时可稍后在「我的订单」重试';
+                } catch (e) {
+                    document.getElementById('brief').textContent = '网络错误';
+                    document.getElementById('btnSubmit').disabled = true;
+                }
+            })();
+
+            document.getElementById('btnSubmit').onclick = async function () {
+                var errEl = document.getElementById('err');
+                errEl.textContent = '';
+                var raw = document.getElementById('tipInput').value.trim();
+                var amt = parseFloat(raw);
+                if (!isFinite(amt) || amt <= 0) {
+                    errEl.textContent = '请输入大于 0 的打赏金额';
+                    return;
+                }
+                amt = Math.round(amt * 100) / 100;
+                var btn = document.getElementById('btnSubmit');
+                btn.disabled = true;
+                try {
+                    var res = await fetch(API + '/api/tippings/' + orderId, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + token
+                        },
+                        body: JSON.stringify({ tipAmount: amt })
+                    });
+                    var data = await res.json().catch(function () { return {}; });
+                    if (!res.ok) {
+                        errEl.textContent = data.message || '打赏失败';
+                        btn.disabled = false;
+                        return;
+                    }
+                    alert(data.message || '打赏成功');
+                    goDashboardPanel(returnPanel);
+                } catch (e) {
+                    errEl.textContent = '网络错误';
+                    btn.disabled = false;
+                }
+            };
+        }
+    </script>
+</body>
+</html>

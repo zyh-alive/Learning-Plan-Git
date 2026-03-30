@@ -13,6 +13,8 @@ router.get('/consultants/:id/reviews', authenticateToken, reviewController.listP
 router.get('/consultant/orders-review-feed', authenticateToken, reviewController.listOwnerConsultantOrdersFeed);
 // 顾问：本人只包含已评价的订单评价列表（原 /api/order/consultant/reviews-review-feed）
 router.get('/consultant/reviews-review-feed', authenticateToken, reviewController.listOwnerConsultantReviewsFeed);
+// 顾问：本人只包含已打赏的订单评价列表（原 /api/order/consultant/tippings-review-feed）
+router.get('/consultant/tippings-review-feed', authenticateToken, reviewController.listOwnerConsultantTippingsFeed);
 // 客户：对指定订单提交评价（订单须为待评价且归属当前用户）
 router.post('/:orderId', authenticateToken, reviewController.submitReview);
 

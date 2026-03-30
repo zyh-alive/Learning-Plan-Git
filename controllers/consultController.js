@@ -31,6 +31,7 @@ exports.getList = async (req, res) => {
         const offset = (page - 1) * limit;
         
         // 查询顾问资料表（只返回公开字段）
+        // 全部列表：非离线(1 空闲 / 2 忙碌)优先，同组内再按 consultantId 升序
         const { count, rows } = await ConsultantProfile.findAndCountAll({
             where,
             attributes: [  // 🔑 只返回这些字段
@@ -41,7 +42,11 @@ exports.getList = async (req, res) => {
             ],
             limit: parseInt(limit),
             offset: parseInt(offset),
-            order: [['consultantId', 'ASC']]
+            order: [
+                // 单表查询：离线(0) 排后，空闲/忙碌 在前；同组内按 id
+                [sequelize.literal('(CASE WHEN work_status = 0 THEN 1 ELSE 0 END)'), 'ASC'],//literal：直接执行 SQL 语句，不进行参数替换
+                ['consultantId', 'ASC']
+            ]
         });
         
         // 格式化返回

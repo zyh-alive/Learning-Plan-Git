@@ -9,6 +9,7 @@ const Order = require('../models/Order');
 const OrderReview = require('../models/OrderReview');
 const ConsultantProfile = require('../models/ConsultantProfile');
 const UserProfile = require('../models/UserProfile');
+const Tipping = require('../models/Tipping');
 
 /**
  * 订单+评价列表（两接口共用）
@@ -48,6 +49,11 @@ async function fetchConsultantOrderReviewFeed({ currentUserId=null, consultantId
         where: { userId: { [Op.in]: orders.map(o => o.userId) } },
         attributes: ['userId', 'name']
     });
+    const tippings = await Tipping.findAll({ attributes: ['orderId', 'tipAmount', 'createdAt'] });
+    const tippingsMap = {};//创建一个对象，用于存储订单ID和打赏信息
+    for (const tipping of tippings) {
+        tippingsMap[tipping.orderId] = tipping;
+    }
     const reviewsMap = {};//创建一个对象，用于存储订单ID和评价信息
     for (const review of reviews) {
         reviewsMap[review.orderId] = review;
@@ -60,6 +66,7 @@ async function fetchConsultantOrderReviewFeed({ currentUserId=null, consultantId
     const list = orders.map((o) => {
         //o：订单信息
         //const rev = Array.isArray(o.reviews) && o.reviews.length ? o.reviews[0] : null;//isArray：判断是否为数组，length：数组长度，[0]：取第一个元素
+        const tip = tippingsMap[o.orderId];
         const rev = reviewsMap[o.orderId];
         const name = nameMap[o.userId];
         const item = {//item：订单评价信息
@@ -71,6 +78,8 @@ async function fetchConsultantOrderReviewFeed({ currentUserId=null, consultantId
             orderStatus: o.status,//订单状态
             rating: rev != null ? Number(rev.rating) : null,//评分
             reviewContent: rev ? rev.content : null,//评价内容
+            tipAmount: tip ? Number(tip.tipAmount) : null,//打赏金额
+            createdAt: tip ? tip.createdAt : null,//打赏时间
             reviewedAt: rev ? rev.reviewAt : null,//评价时间
             completedAt: o.completedAt,//完成时间
         };//返回订单评价信息
@@ -91,7 +100,12 @@ async function fetchConsultantOrderReviewFeed({ currentUserId=null, consultantId
             const onlyreviews = list.filter(item => item.rating !== null&&item.reviewContent !== null);//筛选出有评价的订单
             onlyreviews.sort((a, b) => b.reviewedAt - a.reviewedAt);//降序，最新评价排在最前面
             return { list: onlyreviews, filter };
-        }else{
+        }else if(filter === 'tippings_only'){
+            const onlytippings = list.filter(item => item.tipAmount !== null);//筛选出有打赏的订单
+            onlytippings.sort((a, b) =>b.createdAt- a.createdAt); // 降序，最新打赏排在最前面
+            return { list: onlytippings, filter };
+        }
+        else{
             const after_sort_list = list.sort((a, b) => b.completedAt - a.completedAt);//降序，最新评价排在最前面
             return { list: after_sort_list, filter };
         }
@@ -160,8 +174,8 @@ exports.listOwnerConsultantReviewsFeed = async (req, res) => {
             return res.status(403).json({ message: '仅顾问可查看' });
         }
 
-        const raw = (req.query.filter || 'reviews_only').toLowerCase();//raw：原始查询条件，toLowerCase：转换为小写
-        const filter = raw === 'all' ? 'all' : 'reviews_only';//filter：过滤条件，'all'：包含待评价和已评价，'reviews_only'：仅包含已评价和没有评价，'reviews_only'：仅包含已评价
+        //const raw = (req.query.filter || 'reviews_only').toLowerCase();//raw：原始查询条件，toLowerCase：转换为小写
+        //const filter = raw === 'all' ? 'all' : 'reviews_only';//filter：过滤条件，'all'：包含待评价和已评价，'reviews_only'：仅包含已评价和没有评价，'reviews_only'：仅包含已评价
         const result_filter =await fetchConsultantOrderReviewFeed({
             consultantId: Number(cid),
             filter: 'reviews_only'
@@ -176,6 +190,26 @@ exports.listOwnerConsultantReviewsFeed = async (req, res) => {
     }
 };
 
+//顾问查询只包含已打赏的订单评价列表
+exports.listOwnerConsultantTippingsFeed = async (req, res) => {
+    try {
+        const role = req.user.role || '';
+        const cid = req.user.consultantId;
+        if (role !== 'consultant' || cid == null) {//role：角色，'consultant'：顾问，'user'：顾客
+            return res.status(403).json({ message: '仅顾问可查看' });
+        }
+        const result_tippings = await fetchConsultantOrderReviewFeed({
+            consultantId: Number(cid),
+            filter: 'tippings_only'
+        });
+        if (result_tippings.error) {//error：错误信息
+            return res.status(result_tippings.status).json({ message: result_tippings.error });
+        }
+        res.status(200).json({ message: '获取成功', data: { list: result_tippings.list, filter: result_tippings.filter} });
+    } catch (err) {//err：错误信息
+        console.error('listOwnerConsultantTippingsFeed:', err);
+        res.status(500).json({ message: '服务器错误' });    }
+};
 /**
  * POST /api/reviews/:orderId
  * 待评价 → 写入 order_reviews + 订单改为 completed 并写 completed_at

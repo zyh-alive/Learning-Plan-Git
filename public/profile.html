@@ -417,8 +417,8 @@
 
         .cp-stat-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
         }
         .cp-stat-tile {
             display: block;
@@ -572,6 +572,11 @@
                             <span class="n" id="cp_tile_reviews">0</span>
                             <span class="lbl">评价数</span>
                             <span class="hint">点按只看已评价</span>
+                        </a>
+                        <a class="cp-stat-tile" id="cp_link_tippings" href="#">
+                            <span class="n" id="cp_tile_tippings">0</span>
+                            <span class="lbl">打赏订单</span>
+                            <span class="hint">有打赏的订单数</span>
                         </a>
                     </div>
                     <a href="coin-wallet.html" class="cp-coin-entry" id="cp_coin_entry" aria-label="打开金币中心，提现与记录">
@@ -745,6 +750,17 @@
                             'consultant-orders-feed.html' + emb + 'filter=all';
                         document.getElementById('cp_link_reviews').href =
                             'consultant-orders-feed.html' + emb + 'filter=reviews_only';
+                        document.getElementById('cp_link_tippings').href =
+                            'consultant-tippings-feed.html' + (document.body.classList.contains('embed') ? '?embed=1' : '');
+                        var tipN = 0;
+                        try {
+                            var tr = await fetch(API_BASE + '/api/reviews/consultant/tippings-review-feed', {
+                                headers: { 'Authorization': 'Bearer ' + token }
+                            });
+                            var tj = await tr.json().catch(function () { return {}; });
+                            if (tr.ok && tj.data && tj.data.list) tipN = tj.data.list.length;
+                        } catch (eT) {}
+                        document.getElementById('cp_tile_tippings').textContent = String(tipN);
                     } else {
                         document.getElementById('walletCoin').textContent = formatCoin(u.coin);
                         document.getElementById('c_phone').textContent = u.phone || '--';

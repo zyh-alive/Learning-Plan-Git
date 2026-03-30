@@ -235,8 +235,8 @@
         .badge-2 { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
         .stats {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
             margin-top: 4px;
         }
         .stat {
@@ -543,6 +543,7 @@
                         '<div class="stat"><div class="stat-val" id="statScopeReviews">' +
                         esc(String(reviews)) +
                         '</div><div class="stat-label">评价数</div></div>' +
+                        '<div class="stat"><div class="stat-val" id="statScopeTippings">0</div><div class="stat-label">打赏订单</div></div>' +
                         '</div>' +
                         buildIntroBlock(c) +
                         '<div class="reviews-section">' +
@@ -566,6 +567,11 @@
                             if (arr.length === 0) {
                                 listHost.innerHTML = '<p class="review-empty">暂无上述范围内的订单</p>';
                             } else {
+                                var tipCnt = arr.filter(function (it) {
+                                    return it.tipAmount != null && Number(it.tipAmount) > 0;
+                                }).length;
+                                var tipStatEl = document.getElementById('statScopeTippings');
+                                if (tipStatEl) tipStatEl.textContent = String(tipCnt);
                                 listHost.innerHTML = arr.map(function (it) {
                                     var os = orderStatusLabelAndClass(it.orderStatus);
                                     var mine = uid != null && Number(it.userId) === uid;
@@ -579,8 +585,15 @@
                                             : '';
                                     var statusHtml =
                                         '<span class="order-st ' + os.cls + '">' + esc(os.text) + '</span>';
+                                    var tipPart =
+                                        it.tipAmount != null && Number(it.tipAmount) > 0
+                                            ? '<div class="meta-time" style="color:#ad6800;font-weight:600">打赏：¥ ' +
+                                              esc(Number(it.tipAmount).toFixed(2)) +
+                                              '</div>'
+                                            : '';
                                     var timePart =
                                         '<div class="meta-time">订单完成：' + esc(formatDateTime(it.completedAt)) + '</div>' +
+                                        tipPart +
                                         (hasListedReview(it)
                                             ? '<div class="meta-time">评价时间：' + esc(formatDateTime(it.reviewedAt)) + '</div>'
                                             : '');

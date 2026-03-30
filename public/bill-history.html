@@ -126,7 +126,7 @@
         <a class="back" href="profile.html" id="backProfile">← 返回个人资料</a>
     </div>
     <p class="sub-hint" id="apiNote">
-        客户：按 <code style="color:rgba(255,255,255,0.75)">transactionType</code> 显示类型与红绿正负。顾问：若 <code style="color:rgba(255,255,255,0.75)">fundStatus</code> 为 released，本条固定显示为「收款」、绿色、+。
+        打赏：顾客为红色「−」支出；顾问为绿色「+」入账。其余：客户按 <code style="color:rgba(255,255,255,0.75)">transactionType</code>；顾问订单收款在 <code style="color:rgba(255,255,255,0.75)">fundStatus</code> 为 released 时显示绿色「+」。
     </p>
     <div class="balance-hero">
         <div class="label">当前金币余额</div>
@@ -202,6 +202,13 @@
 
         /** 顾问端：资金状态 released → 收款、绿色、+；顾客端始终走 flowTypeMeta，不变 */
         function rowDisplayMeta(it) {
+            var ttTip = String(it.transactionType || '').trim();
+            if (ttTip === '打赏') {
+                if (role === 'consultant') {
+                    return { label: '打赏入账', sign: '+', cls: 'amt-plus' };
+                }
+                return { label: '打赏', sign: '-', cls: 'amt-minus' };
+            }
             if (role === 'consultant' && String(it.fundStatus || '').toLowerCase() === 'released') {
                 return { label: '收款', sign: '+', cls: 'amt-plus' };
             }

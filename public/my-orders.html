@@ -317,7 +317,52 @@
                 .replace(/"/g, '&quot;');
         }
 
-        function renderList(list) {
+        function getJwtUserId() {
+            try {
+                var b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+                var payload = JSON.parse(decodeURIComponent(escape(atob(b64))));
+                return payload.userId != null ? Number(payload.userId) : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        /** 订单列表接口不含打赏字段：按顾问拉取评价流并筛出当前用户的打赏金额 */
+        async function buildTipAmountMapForOrders(list) {
+            var uid = getJwtUserId();
+            var map = {};
+            if (uid == null || !list || !list.length) return map;
+            var cids = [];
+            var seen = {};
+            list.forEach(function (o) {
+                var c = o.consultantId;
+                if (c != null && !seen[c]) {
+                    seen[c] = true;
+                    cids.push(c);
+                }
+            });
+            for (var i = 0; i < cids.length; i++) {
+                try {
+                    var res = await fetch(
+                        API_BASE + '/api/reviews/consultants/' + cids[i] + '/reviews?filter=all',
+                        { headers: { 'Authorization': 'Bearer ' + token } }
+                    );
+                    var data = await res.json().catch(function () { return {}; });
+                    if (!res.ok) continue;
+                    var arr = (data.data && data.data.list) || [];
+                    arr.forEach(function (it) {
+                        if (Number(it.userId) === uid && it.tipAmount != null && it.orderId != null) {
+                            var n = Number(it.tipAmount);
+                            if (!isNaN(n) && n > 0) map[it.orderId] = n;
+                        }
+                    });
+                } catch (e) {}
+            }
+            return map;
+        }
+
+        function renderList(list, tipMap) {
+            tipMap = tipMap || {};
             var wrap = document.getElementById('listWrap');
             clearAcceptDeadlineTicker();
             if (acceptReloadAfterZeroTimer) {
@@ -367,7 +412,18 @@
                         seQs +
                         '">申请售后</a>';
                 }
-                var actionRow = payLink + rushLink + inviteLink + chatLink + reviewLink + servicingLink;
+                var tipQs = '&returnPanel=slot2' + (DASH_EMBED ? '&embed=1' : '');
+                var alreadyTipped = tipMap[o.orderId] != null && Number(tipMap[o.orderId]) > 0;
+                var tipLink =
+                    (o.status === 'pending_review' || o.status === 'completed') && !alreadyTipped
+                        ? '<a class="btn-confirm-start' +
+                          (DASH_EMBED ? ' js-tip-fullscreen' : '') +
+                          '" style="background:linear-gradient(135deg,#fa8c16,#d46b08);color:#fff;margin-right:8px" href="order-tip.html?orderId=' +
+                          o.orderId +
+                          tipQs +
+                          '">打赏</a>'
+                        : '';
+                var actionRow = payLink + rushLink + inviteLink + chatLink + reviewLink + servicingLink + tipLink;
                 var acceptHint = '';
                 var deadlineMs = getOrderAcceptDeadlineMs(o);
                 if (deadlineMs != null && (o.status === 'pending' || o.status === 'pending_rush') && o.paidAt) {
@@ -391,6 +447,12 @@
                 if (o.status === 'expired') {
                     acceptHint = '<div class="row" style="color:#888;font-size:13px">订单超时未接单，冻结金额已按「订单过期」退回您的金币账户。</div>';
                 }
+                var tipRow =
+                    alreadyTipped
+                        ? '<div class="row"><strong>打赏金额：</strong>¥ ' +
+                          Number(tipMap[o.orderId]).toFixed(2) +
+                          '</div>'
+                        : '';
                 var afterSaleBlock = '';
                 if (o.status === 'servicing_completed') {
                     var rawType = o.servicingReasonType != null ? o.servicingReasonType : o.servicing_reason_type;
@@ -430,6 +492,7 @@
                     '<div class="row"><strong>服务类型：</strong>' + (o.serviceType || '--') + '</div>' +
                     '<div class="content">' + (o.serviceContent || '无描述') + '</div>' +
                     '<div class="price">¥ ' + price + '</div>' +
+                    tipRow +
                     '<div class="time">下单时间：' + fmtTime(o.createdAt) + '</div>' +
                     afterSaleBlock +
                     acceptHint +
@@ -458,7 +521,11 @@
                     return;
                 }
                 var list = (data.data && data.data.list) || [];
-                renderList(list);
+                var tipMap = {};
+                try {
+                    tipMap = await buildTipAmountMapForOrders(list);
+                } catch (eTip) {}
+                renderList(list, tipMap);
                 syncUserOrdersAcceptBaseline(list);
                 try {
                     if (DASH_EMBED && window.parent && typeof window.parent.__dashboardRefreshUserOrdersDot === 'function') {
@@ -513,6 +580,22 @@
                     window.top.location.href = svcHref;
                 } catch (x2) {
                     window.location.href = svcHref;
+                }
+                return;
+            }
+            var tipA = e.target.closest('a.js-tip-fullscreen');
+            if (tipA) {
+                e.preventDefault();
+                e.stopPropagation();
+                var tipHref = tipA.getAttribute('href');
+                if (!tipHref) return;
+                try {
+                    sessionStorage.setItem('orderChatReturnPanel', 'slot2');
+                } catch (x) {}
+                try {
+                    window.top.location.href = tipHref;
+                } catch (x2) {
+                    window.location.href = tipHref;
                 }
                 return;
             }

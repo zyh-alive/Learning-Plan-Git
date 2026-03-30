@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打赏订单</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+            background: linear-gradient(165deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+            padding: 16px 16px 32px;
+        }
+        .top {
+            max-width: 440px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .back {
+            color: rgba(255,255,255,0.9);
+            text-decoration: none;
+            font-size: 15px;
+        }
+        .back:hover { text-decoration: underline; }
+        h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            flex: 1;
+        }
+        .sub-hint {
+            max-width: 440px;
+            margin: 0 auto 14px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.55);
+            line-height: 1.5;
+        }
+        .list-wrap { max-width: 440px; margin: 0 auto; }
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 16px 16px 18px;
+            margin-bottom: 12px;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.15);
+        }
+        .card-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 12px;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .oid { font-size: 13px; font-weight: 700; color: #d46b08; }
+        .cust { font-size: 13px; color: #666; }
+        .stype {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1a1a1a;
+            width: 100%;
+        }
+        .tip-amt {
+            font-size: 20px;
+            font-weight: 800;
+            color: #ad6800;
+            margin-top: 8px;
+        }
+        .demand {
+            font-size: 14px;
+            color: #444;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .meta-time {
+            font-size: 12px;
+            color: #888;
+            line-height: 1.5;
+            margin-top: 4px;
+        }
+        .block-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #a0aec0;
+            letter-spacing: 0.08em;
+            margin: 10px 0 6px;
+        }
+        .empty {
+            text-align: center;
+            padding: 36px 16px;
+            color: rgba(255,255,255,0.65);
+            font-size: 14px;
+        }
+        .err { color: #ffccc7; }
+    </style>
+</head>
+<body>
+    <script src="js/embed-parent-nav.js"></script>
+    <div class="top">
+        <a class="back" id="backLink" href="profile.html">← 返回</a>
+        <h1>打赏订单</h1>
+    </div>
+    <p class="sub-hint">按打赏时间由新到旧排列；仅包含有打赏记录的订单。</p>
+    <div class="list-wrap" id="listWrap"><p class="empty">加载中…</p></div>
+    <script>
+        var API = window.location.origin;
+        var token = localStorage.getItem('token');
+        var embed = new URLSearchParams(location.search).get('embed') === '1';
+
+        function esc(t) {
+            return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        }
+        function formatDateTime(v) {
+            if (v == null || v === '') return '—';
+            var d = new Date(v);
+            if (isNaN(d.getTime())) return '—';
+            function z(n) { return ('0' + n).slice(-2); }
+            return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
+        }
+        function statusPill(st) {
+            if (st === 'pending_review') return '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#fff7e6;color:#d46b08">待客户评价</span>';
+            if (st === 'completed') return '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#f6ffed;color:#237804">已完成</span>';
+            if (st === 'servicing_requested') return '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#e6fffb;color:#006d75">售后处理中</span>';
+            if (st === 'servicing_completed') return '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#f0f5ff;color:#2f54eb">售后已完成</span>';
+            return '<span style="font-size:11px">' + esc(st) + '</span>';
+        }
+        function getRole() {
+            try {
+                var b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+                return JSON.parse(decodeURIComponent(escape(atob(b64)))).role || '';
+            } catch (e) { return ''; }
+        }
+
+        var backLink = document.getElementById('backLink');
+        if (embed) backLink.href = 'profile.html?embed=1';
+
+        if (!token || getRole() !== 'consultant') {
+            window.location.href = 'login.html';
+        } else {
+            (async function () {
+                var wrap = document.getElementById('listWrap');
+                try {
+                    var res = await fetch(API + '/api/reviews/consultant/tippings-review-feed', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    var j = await res.json();
+                    if (res.status === 401 || res.status === 403) {
+                        localStorage.removeItem('token');
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    if (!res.ok) {
+                        wrap.innerHTML = '<p class="empty err">' + esc(j.message || '加载失败') + '</p>';
+                        return;
+                    }
+                    var list = (j.data && j.data.list) || [];
+                    if (list.length === 0) {
+                        wrap.innerHTML = '<p class="empty">暂无打赏订单</p>';
+                        return;
+                    }
+                    wrap.innerHTML = list.map(function (it) {
+                        var custName = (it.name != null && String(it.name).trim()) ? String(it.name).trim() : '';
+                        var custSpan =
+                            custName || it.userId != null
+                                ? '<span class="cust">' +
+                                  (custName ? '客户 ' + esc(custName) : '用户 #' + esc(String(it.userId))) +
+                                  '</span>'
+                                : '';
+                        var tipNum = it.tipAmount != null ? Number(it.tipAmount) : 0;
+                        var timeBlock =
+                            '<div class="block-label">时间</div>' +
+                            '<div class="meta-time">订单完成时间：' + esc(formatDateTime(it.completedAt)) + '</div>' +
+                            '<div class="meta-time">评价时间：' +
+                            esc(formatDateTime(it.reviewedAt)) +
+                            '</div>' +
+                            '<div class="meta-time">打赏时间：' + esc(formatDateTime(it.createdAt)) + '</div>';
+                        return '<div class="card">' +
+                            '<div class="card-head">' +
+                            '<span class="oid">订单 #' + esc(String(it.orderId)) + '</span>' +
+                            custSpan +
+                            statusPill(it.orderStatus) +
+                            '<div class="stype">' + esc(it.serviceType || '—') + '</div>' +
+                            '</div>' +
+                            '<div class="block-label">客户需求</div>' +
+                            '<div class="demand">' + esc(it.serviceContent || '—') + '</div>' +
+                            '<div class="tip-amt">¥ ' + esc(tipNum.toFixed(2)) + '</div>' +
+                            timeBlock +
+                            '</div>';
+                    }).join('');
+                } catch (e) {
+                    wrap.innerHTML = '<p class="empty err">网络错误</p>';
+                }
+            })();
+        }
+    </script>
+</body>
+</html>
