@@ -259,20 +259,30 @@
             document.getElementById('payOverlay').classList.remove('show');
         });
 
+        // submitting：是否正在提交充值请求；true 时忽略重复点击，防止重复下单
         var submitting = false;
+        // getElementById('btn')：取「确认充值」按钮 DOM；addEventListener('click', ...)：监听单击
         document.getElementById('btn').addEventListener('click', async function () {
+            // 若上一笔请求尚未结束，直接返回，避免连点产生多笔待支付流水，防止重复多点
             if (submitting) return;
+            // getElementById('amount').value：输入框里的字符串；parseFloat(...)：转成浮点数（元）
             var n = parseFloat(document.getElementById('amount').value);
+            // !n：NaN、0、空串解析后视为无效；<=0 或 >10000 与后端校验一致
             if (!n || n <= 0 || n > 10000) {
                 alert('请输入 1～10000 之间的金额');
                 return;
             }
+            // 标记进入提交中，后续分支里出错会再改回 false
             submitting = true;
+            // btn：按钮引用，后面要改文案、禁用，避免重复点
             var btn = document.getElementById('btn');
-            btn.disabled = true;
-            btn.textContent = '请求支付中…';
-            // 必须在用户点击的同步阶段打开窗口；若在 await fetch 之后再 open，会被当成非用户手势弹窗而拦截或无法写入。
+            btn.disabled = true; // disabled：原生禁用，鼠标点不动
+            btn.textContent = '请求支付中…'; // textContent：按钮上显示的文字
+            // window.open(url, '_blank')：新开浏览器标签页；'about:blank'：先打开空白页
+            // 必须在本次点击的同步代码里执行 open，不能放在 await fetch 之后：
+            // 否则浏览器认为不是「用户主动打开弹窗」，会拦截或限制对子窗口 document.write
             var payWindow = window.open('about:blank', '_blank');
+            // 若用户禁止弹窗，open 返回 null
             if (!payWindow) {
                 submitting = false;
                 btn.disabled = false;
@@ -281,52 +291,69 @@
                 return;
             }
             try {
+                // document.open / write / close：向子窗口写入一段临时 HTML，提示「正在请求」
                 payWindow.document.open();
                 payWindow.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>正在跳转支付</title></head><body style="font-family:sans-serif;padding:24px;">正在请求支付，请稍候…</body></html>');
                 payWindow.document.close();
+                // fetch：浏览器发起 HTTP；API 为当前站点 origin（与页面同源）
+                // '/api/transaction'：POST 创建充值流水并返回支付宝表单 HTML 字符串
+                // await：暂停直到网络返回，期间不阻塞页面主线程渲染
                 var res = await fetch(API + '/api/transaction', {
-                    method: 'POST',
+                    method: 'POST', // HTTP 方法
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + token
+                        'Content-Type': 'application/json', // 请求体是 JSON
+                        'Authorization': 'Bearer ' + token // JWT，后端 authenticateToken 校验身份
                     },
+                    // JSON.stringify：把对象转成 JSON 字符串
+                    // transactionAmount：充值金额（元）；payChannel：'alipay' 或 'wechat'
                     body: JSON.stringify({ transactionAmount: n, payChannel: selectedChannel })
                 });
+                // res.json()：把响应体解析成 JavaScript 对象（异步）
                 var data = await res.json();
+                // 401 未授权 / 403 禁止：token 无效或角色不对，清 token 并去登录页
                 if (res.status === 401 || res.status === 403) {
                     payWindow.close();
                     localStorage.removeItem('token');
                     location.href = 'login.html';
                     return;
                 }
+                // 503：服务不可用；此处特判微信未开通时的业务响应
                 if (res.status === 503 && data.payChannel === 'wechat') {
                     payWindow.close();
                     alert(data.message || '微信支付即将开通');
                     return;
                 }
+                // res.ok：状态码 200–299；否则关弹窗并提示后端 message
                 if (!res.ok) {
                     payWindow.close();
                     alert(data.message || '充值失败');
                     return;
                 }
+                // payUrl：后端返回的 HTML 字符串（内含 form + script 自动 POST 到支付宝）
                 var payUrl = data.payUrl;
                 if (!payUrl || typeof payUrl !== 'string') {
                     payWindow.close();
                     alert('未获取到支付表单，请稍后重试');
                     return;
                 }
+                // 再次 open/write：用支付宝返回的表单覆盖子窗口，script 会提交表单跳转收银台
                 payWindow.document.open();
-                payWindow.document.write(payUrl);//将支付宝的支付表单写入到新窗口中
+                payWindow.document.write(payUrl);
                 payWindow.document.close();
+                // 蒙层提示用户去新窗口完成支付
                 document.getElementById('payOverlay').classList.add('show');
+                // 刷新页面上展示的余额（若异步通知尚未到账，数字可能仍略滞后）
                 loadBal();
             } catch (e) {
-                try { payWindow.close(); } catch (e2) {}
+                // fetch 失败、断网、JSON 解析失败等都会进 catch
+                try { payWindow.close(); } catch (e2) {} // 子窗口可能已被用户关掉，close 再包 try 防止报错
                 alert('网络错误');
             } finally {
+                // 无论成功失败，恢复按钮可点状态（前面 return 的分支若未执行 finally 仍会执行）
                 submitting = false;
                 btn.disabled = false;
                 btn.textContent = '确认充值';
+                //这里前端已经做到了防抖（重复多点），可是还是出现多条记录，因此进行后端校验和数据库唯一索引。
             }
         });
     </script>

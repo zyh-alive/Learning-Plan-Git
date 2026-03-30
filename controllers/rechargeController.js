@@ -66,6 +66,20 @@ exports.recharge = async (req, res) => {
                 return res.status(404).json({ message: '用户资料不存在' });
             }
 
+            //后端幂等，防止重复多点，导致多条待支付订单
+            const pendingOrder = await FundTransaction.findOne({
+                where: {
+                    userId,
+                    transactionType: '充值',
+                    payStatus: 'pending'
+                },
+                transaction,
+            });
+            if (pendingOrder) {
+                await transaction.commit();
+                return res.status(400).json({ message: '有待支付的订单，请先完成或取消之后再进行充值！' });
+            }
+
             // 先生成商户单号，写入流水后再调支付宝（out_trade_no = merchantOrderId）
             //这次的写入流水是创建订单（支付订单），不是充值完成后的流水
             const merchantOrderId = paymentController.generateMerchantOrderId(userId);//生成随机商户订单号

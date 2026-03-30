@@ -59,7 +59,7 @@
             }
             titleEl.textContent = '正在确认到账…';
             descEl.textContent = '正在查询支付宝支付结果并更新余额，请稍候。';
-            fetch(API + '/api/transaction/recharge/confirm-sync', {
+            fetch(API + '/api/transaction/recharge/alipay/callback', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
