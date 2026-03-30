@@ -18,3 +18,13 @@ feishu:
   enableMorningBrief: ${ENABLE_FEISHU_MORNING} # 1 开启早间播报
   morningHour: ${FEISHU_MORNING_HOUR}
   morningMinute: ${FEISHU_MORNING_MINUTE}
+
+alipay:
+  appId: ${ALIPAY_APP_ID}
+  privateKey: ${ALIPAY_PRIVATE_KEY}
+  alipayPublicKey: ${ALIPAY_PUBLIC_KEY}
+  gateway: ${ALIPAY_GATEWAY}
+  # 同步跳转页（用户付完回到站点）；不配则默认 http://localhost:{server.port}/pay-result.html
+  # returnUrl: ${ALIPAY_RETURN_URL}
+  # 异步通知地址，需公网可达；本地开发可用内网穿透，路径与路由一致：/api/pay/notify/alipay
+  notifyUrl: ${ALIPAY_NOTIFY_URL}

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>支付结果</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+            background: linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        h1 { font-size: 20px; color: #333; margin: 0 0 12px; }
+        p { color: #666; font-size: 15px; line-height: 1.6; margin: 0 0 24px; }
+        a {
+            display: inline-block;
+            padding: 12px 28px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1 id="title">支付处理中</h1>
+        <p id="desc">若您已完成付款，系统会尝试自动确认到账。本地开发时支付宝<strong>无法访问 localhost</strong> 异步通知，本页会用商户单号向支付宝查单并补入账。</p>
+        <a href="coin-wallet.html">返回金币中心</a>
+        <p style="margin-top:20px;margin-bottom:0;"><a href="recharge.html" style="background:#eee;color:#333;">再去充值</a></p>
+    </div>
+    <script>
+        (function () {
+            var API = window.location.origin;
+            var params = new URLSearchParams(location.search);
+            var outTradeNo = params.get('out_trade_no');
+            var token = localStorage.getItem('token');
+            var titleEl = document.getElementById('title');
+            var descEl = document.getElementById('desc');
+            if (!outTradeNo || !token) {
+                if (!outTradeNo) {
+                    descEl.innerHTML = '未携带支付宝回传的商户订单号时无法自动查单。请返回金币中心刷新余额；生产环境请配置公网可访问的 <code>notifyUrl</code>。';
+                }
+                return;
+            }
+            titleEl.textContent = '正在确认到账…';
+            descEl.textContent = '正在查询支付宝支付结果并更新余额，请稍候。';
+            fetch(API + '/api/transaction/recharge/confirm-sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({ outTradeNo: outTradeNo })
+            })
+                .then(function (res) {
+                    return res.json().then(function (body) {
+                        return { res: res, body: body };
+                    });
+                })
+                .then(function (_ref) {
+                    var res = _ref.res;
+                    var j = _ref.body || {};
+                    if (res.status === 401 || res.status === 403) {
+                        titleEl.textContent = '请先登录';
+                        descEl.textContent = '登录状态无效，请重新登录后再打开本页或到金币中心查看余额。';
+                        return;
+                    }
+                    if (res.ok) {
+                        if (j.data && j.data.pending) {
+                            titleEl.textContent = '尚未查到支付成功';
+                            descEl.textContent = j.message || '请稍后刷新金币中心；若已付款仍无余额，请检查是否沙箱环境或联系管理员。';
+                            return;
+                        }
+                        if (j.data && j.data.coin != null) {
+                            titleEl.textContent = j.data.alreadyApplied ? '该笔已入账' : '充值已到账';
+                            descEl.textContent =
+                                (j.message || '') +
+                                ' 当前金币余额：' +
+                                Number(j.data.coin).toFixed(2);
+                            return;
+                        }
+                    }
+                    titleEl.textContent = '自动确认未完成';
+                    descEl.textContent = j.message || ('请求失败 HTTP ' + res.status);
+                })
+                .catch(function () {
+                    titleEl.textContent = '网络异常';
+                    descEl.textContent = '请返回金币中心手动刷新余额。';
+                });
+        })();
+    </script>
+</body>
+</html>

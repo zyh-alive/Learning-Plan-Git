@@ -53,7 +53,8 @@
 <body>
     <div class="card" id="main">
         <h1>确认支付</h1>
-        <p class="sub">付款后顾问方可接单并开始服务；若取消订单，已付金额将退回您的账户</p>
+        <p class="sub">本页使用<strong>账户金币</strong>支付订单，<strong>不跳转支付宝</strong>。付款后顾问方可接单；取消订单时金额退回余额。</p>
+        <p class="sub" style="font-size:12px;color:#888;margin-top:-8px;">支付宝仅用于在「充值」页给账户加金币；加完金币后再回到此处支付订单。</p>
         <div id="box"></div>
     </div>
     <a class="back" href="#" id="footerBack">我的订单</a>
@@ -145,7 +146,8 @@
                     '<div class="price">' + formatCoin(price) + '<span> 金币（本单付款金额）</span></div>' +
                     '<div class="bal">当前余额：<strong>' + formatCoin(coin) + '</strong> 金币</div>' +
                     '<div class="actions">' +
-                    '<button type="button" class="btn-pay" id="btnPay">确认付款</button>' +
+                    '<button type="button" class="btn-pay" id="btnPay">用金币支付</button>' +
+                    '<a class="btn-cancel" href="recharge.html" style="background:#e8f4ff;color:#1677ff;">金币不足？去充值（支付宝）</a>' +
                     '<a class="btn-cancel" href="#" id="paySkipBack">暂不支付，返回</a></div>' +
                     '<p class="err" id="err"></p>';
 

@@ -153,8 +153,8 @@ exports.setPassword = async (req, res) => {
         const auth = await Auth.create({ phone, password, status: 'active' });
         //创建用户，状态为正常，因为用户刚注册，还没有登录，所以状态为正常
         const tzRaw = req.body.timezone != null ? String(req.body.timezone).trim() : '';
-        const timezone = tzRaw ? tzRaw.slice(0, 50) : 'Asia/Shanghai';
-        const profile = await Profile.create({ [idKey]: auth.id, timezone }); // 写入注册页上报的 IANA 时区
+        const timezone = tzRaw ? tzRaw.slice(0, 50) : 'Asia/Shanghai';//slice：截取字符串，截取前50个字符
+        const profile = await Profile.create({ [idKey]: auth.id, timezone }); // 写入注册页上报的 IANA 时区，timezone：时区
 
         const token = jwt.sign(
             { [idKey]: auth.id, phone: auth.phone, role, token_version: (profile && profile.token_version != null) ? profile.token_version : 0 },

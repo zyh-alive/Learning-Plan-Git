@@ -99,6 +99,32 @@ const FundTransaction = sequelize.define('FundTransaction', {
         type: DataTypes.TEXT,
         allowNull: true,
         comment: '售后退款详情描述'
+    },
+    // 商户订单号（与支付宝 out_trade_no 一致：时间戳+userId+随机数，长数字串）
+    merchantOrderId: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        comment: '商户订单号',
+        unique: true
+    },
+    //支付宝交易号
+    alipayTradeNo: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: '支付宝交易号',
+        unique: true
+    },
+    //交易方式
+    tradeType: {
+        type: DataTypes.ENUM('alipay', 'wechat'),
+        allowNull: true,
+        comment: '交易方式 alipay支付宝 wechat微信'
+    },
+    payStatus: {
+        type: DataTypes.ENUM('pending', 'success', 'failed'),
+        allowNull: false,
+        defaultValue: 'pending',
+        comment: '支付状态 pending待支付 success支付成功 failed支付失败'
     }
 }, {
     tableName: 'fund_transactions',

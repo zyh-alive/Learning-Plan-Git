@@ -4,8 +4,10 @@ const FundTransaction = require('../models/FundTransaction');
 const UserProfile = require('../models/UserProfile');
 const ConsultantProfile = require('../models/ConsultantProfile');
 const sequelize = require('../config/database');
+const paymentController = require('./paymentController');
 // ================================
 // 用户充值金币 - POST /api/recharge
+//说明：由原来的直接处理增减逻辑变成先生成订单并写入，在下面一个函数中进行支付完成后的记录更新
 // ================================
 exports.recharge = async (req, res) => {
     try {
@@ -27,7 +29,20 @@ exports.recharge = async (req, res) => {
             return res.status(400).json({ message: '单次充值金额不能超过 10000' });
         }
 
-        // 3. 事务操作：更新金币 + 创建充值记录
+        const payChannel = String(req.body.payChannel || req.body.tradeType || 'alipay')
+            .trim()
+            .toLowerCase();
+        if (payChannel === 'wechat') {
+            return res.status(503).json({
+                message: '微信支付即将开通，请暂时使用支付宝',
+                payChannel: 'wechat'
+            });
+        }
+        if (payChannel !== 'alipay') {
+            return res.status(400).json({ message: '不支持的支付方式' });
+        }
+
+        // 3. 事务操作：创建待支付流水 + 调用支付宝
         const transaction = await sequelize.transaction();//开启事务，转账事务，保证数据一致性       
         try {
             // 查用户资料
@@ -51,30 +66,39 @@ exports.recharge = async (req, res) => {
                 return res.status(404).json({ message: '用户资料不存在' });
             }
 
-            // 计算充值后的余额
-            const oldBalance = Number(profile.coin || 0);
-            const newBalance = Math.round((oldBalance + amountNum) * 100) / 100;
+            // 先生成商户单号，写入流水后再调支付宝（out_trade_no = merchantOrderId）
+            //这次的写入流水是创建订单（支付订单），不是充值完成后的流水
+            const merchantOrderId = paymentController.generateMerchantOrderId(userId);//生成随机商户订单号
 
-            // 更新金币
-            profile.coin = newBalance;
-            await profile.save({ transaction });
+            const fundRow = await FundTransaction.createFundTransaction(
+                {
+                    userId,
+                    transactionType: '充值',
+                    payStatus: 'pending',
+                    fundStatus: 'frozen',
+                    tradeType: 'alipay',
+                    reason: '支付宝充值待支付',
+                    purpose: null,
+                    transactionAmount: amountNum,
+                    customerBalanceAfter: profile.coin,
+                    merchantOrderId,
+                    operatedAt: new Date()
+                },
+                { transaction }
+            );
 
-            // 创建充值记录
-            await FundTransaction.createFundTransaction({
-                userId,
-                transactionType: '充值',
-                fundStatus: 'completed',
-                reason: '用户充值成功',
-                purpose: null,
-                transactionAmount: amountNum,
-                customerBalanceAfter: newBalance,
-                operatedAt: new Date(),
-            }, { transaction });
+            const payUrl = paymentController.createRechargeOrder(amountNum, merchantOrderId);
+            //这里的payUrl是支付宝的支付表单，由前端/浏览器在新窗口 document.write 后跳转支付宝（包含支付宝的支付地址）
+            //在recharge.html的319行
 
             // 提交事务
             await transaction.commit();//正式写入数据库
+            res.json({
+                message: '请前往支付',
+                payUrl
+            });
 
-            // 4. 返回结果
+            /*// 4. 返回结果
             res.json({
                 message: '充值成功',
                 data: {
@@ -83,7 +107,7 @@ exports.recharge = async (req, res) => {
                     newBalance,//新余额
                    operatedAt: new Date()//操作时间
                 }
-            });
+            });*/
         } catch (err) {
             // 出错回滚
             await transaction.rollback();//回滚事务，保证数据一致性
@@ -95,6 +119,80 @@ exports.recharge = async (req, res) => {
     }
 };
 
+/**
+ * 支付宝异步通知：paymentController 验签并按类型分发后调用。
+ * 只更新已存在的一条 FundTransaction（payStatus / fundStatus / 余额），不新建流水。
+ */
+exports.applyAlipayRechargeSuccess = async function applyAlipayRechargeSuccess(params, transactionId) {
+    const t = await sequelize.transaction();
+    try {
+        const fundRow = await FundTransaction.findByPk(transactionId, {//查找流水
+            transaction: t,//事务，保证数据一致性
+            lock: t.LOCK.UPDATE
+        });
+        if (!fundRow || fundRow.transactionType !== '充值') {
+            throw new Error('流水不存在或非充值类型');
+        }
+        if (fundRow.payStatus === 'success') {
+            await t.commit();
+            return;
+        }
+        if (fundRow.payStatus === 'failed') {
+            throw new Error('充值流水已标记失败');
+        }
+
+        const paidCents = Math.round(Number(params.total_amount) * 100);
+        //round四舍五入，乘以100转换为分，转换为整数，避免浮点数精度问题，因为钱可能会有小数点
+        const expectCents = Math.round(Number(fundRow.transactionAmount) * 100);
+        if (!Number.isFinite(paidCents) || !Number.isFinite(expectCents) || paidCents !== expectCents) {//判断是否为数字，并且是否相等
+            throw new Error(
+                `金额不一致: 通知 ${params.total_amount}(${paidCents}分) 流水 ${fundRow.transactionAmount}(${expectCents}分)`
+            );
+        }
+        const paid = paidCents / 100;//转换为元
+
+        const userId = fundRow.userId;//获取用户ID
+        if (userId == null) {
+            throw new Error('流水缺少 userId');
+        }
+
+        const profile = await UserProfile.findOne({
+            where: { userId },
+            transaction: t,
+            lock: t.LOCK.UPDATE
+        });
+        if (!profile) {
+            throw new Error('用户资料不存在');
+        }
+        //console.log('profile.coin是：', profile.coin);
+        const oldBalance = Number(profile.coin || 0);
+        //console.log('oldBalance是：', oldBalance);
+        const newBalance = Math.round((oldBalance + paid) * 100) / 100;
+        profile.coin = newBalance;
+        //console.log('newBalance是：', newBalance);
+        //console.log('profile.coin是：', profile.coin);
+        await profile.save({ transaction: t });
+
+        fundRow.payStatus = 'success';
+        fundRow.fundStatus = 'completed';
+        
+        fundRow.customerBalanceAfter = newBalance;
+        fundRow.transactionAmount = paid;
+        const tradeNo = params.trade_no != null ? String(params.trade_no).trim() : '';
+        if (!tradeNo) {
+            throw new Error('支付宝回调缺少 trade_no');
+        }
+        fundRow.alipayTradeNo = tradeNo;//写入支付宝回调回来的交易号
+        fundRow.operatedAt = new Date();
+        fundRow.reason = '用户充值成功';
+        await fundRow.save({ transaction: t });//这部分是对之前写入的更新
+
+        await t.commit();
+    } catch (e) {
+        await t.rollback();
+        throw e;
+    }
+};
 // ================================
 // 查询充值记录 - GET /api/recharge/history
 // ================================

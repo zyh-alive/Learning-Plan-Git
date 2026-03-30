@@ -64,6 +64,45 @@
         }
         .field input:focus { outline: none; border-color: #667eea; }
         .hint { font-size: 12px; color: #999; margin-top: 8px; }
+        .pay-methods { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+        .pay-methods .label-row { font-size: 14px; color: #666; font-weight: 600; margin-bottom: 4px; }
+        .pay-option {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px;
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            cursor: pointer;
+            background: #fafafa;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .pay-option:hover { border-color: #c5cae8; }
+        .pay-option.selected { border-color: #667eea; background: #f5f6ff; }
+        .pay-option .icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+        .pay-option.alipay .icon { background: linear-gradient(135deg, #1677ff, #0958d9); color: #fff; }
+        .pay-option.wechat .icon { background: linear-gradient(135deg, #07c160, #06ae56); color: #fff; }
+        .pay-option .meta { flex: 1; text-align: left; }
+        .pay-option .meta .name { font-weight: 700; color: #333; font-size: 16px; }
+        .pay-option .meta .sub { font-size: 12px; color: #999; margin-top: 4px; }
+        .pay-option .badge {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: #eee;
+            color: #666;
+            font-weight: 600;
+        }
+        .pay-option .badge.soon { background: #fff3e0; color: #e65100; }
         .submit {
             width: 100%;
             height: 50px;
@@ -77,6 +116,37 @@
             cursor: pointer;
         }
         .submit:disabled { opacity: 0.6; cursor: not-allowed; }
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .overlay.show { display: flex; }
+        .overlay .panel {
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 360px;
+            width: 100%;
+            text-align: center;
+        }
+        .overlay .panel h3 { margin: 0 0 12px; font-size: 18px; color: #333; }
+        .overlay .panel p { margin: 0 0 20px; color: #666; font-size: 14px; line-height: 1.5; }
+        .overlay .panel button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: #667eea;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -97,12 +167,41 @@
             <label for="amount">自定义金额（1～10000）</label>
             <input type="number" id="amount" min="1" max="10000" step="1" placeholder="输入金币数量">
         </div>
-        <p class="hint">充值将立即到账并记入充值记录</p>
+        <div class="pay-methods">
+            <div class="label-row">支付方式</div>
+            <div class="pay-option alipay selected" id="optAlipay" data-channel="alipay" role="button" tabindex="0">
+                <div class="icon">支</div>
+                <div class="meta">
+                    <div class="name">支付宝</div>
+                    <div class="sub">跳转支付宝网页完成付款</div>
+                </div>
+            </div>
+            <div class="pay-option wechat" id="optWechat" data-channel="wechat" role="button" tabindex="0">
+                <div class="icon">微</div>
+                <div class="meta">
+                    <div class="name">微信支付</div>
+                    <div class="sub">扫码或跳转微信钱包支付</div>
+                </div>
+                <span class="badge soon">即将开放</span>
+            </div>
+        </div>
+        <p class="hint">支付完成后请返回本页或金币中心刷新余额；异步到账可能有几秒延迟。</p>
         <button type="button" class="submit" id="btn">确认充值</button>
     </div>
+
+    <div class="overlay" id="payOverlay" aria-hidden="true">
+        <div class="panel">
+            <h3>正在打开支付页</h3>
+            <p>已在新窗口打开支付宝收银台。若被浏览器拦截弹窗，请允许本站弹窗后重试。</p>
+            <button type="button" id="payOverlayClose">知道了</button>
+        </div>
+    </div>
+
     <script>
         var API = window.location.origin;
         var token = localStorage.getItem('token');
+        var selectedChannel = 'alipay';
+
         function getRole() {
             try {
                 var b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -138,6 +237,28 @@
             });
         });
 
+        var optAlipay = document.getElementById('optAlipay');
+        var optWechat = document.getElementById('optWechat');
+        function selectChannel(ch) {
+            selectedChannel = ch;
+            optAlipay.classList.toggle('selected', ch === 'alipay');
+            optWechat.classList.toggle('selected', ch === 'wechat');
+        }
+        optAlipay.addEventListener('click', function () { selectChannel('alipay'); });
+        optAlipay.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectChannel('alipay'); }
+        });
+        optWechat.addEventListener('click', function () {
+            selectChannel('wechat');
+        });
+        optWechat.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectChannel('wechat'); }
+        });
+
+        document.getElementById('payOverlayClose').addEventListener('click', function () {
+            document.getElementById('payOverlay').classList.remove('show');
+        });
+
         var submitting = false;
         document.getElementById('btn').addEventListener('click', async function () {
             if (submitting) return;
@@ -149,32 +270,58 @@
             submitting = true;
             var btn = document.getElementById('btn');
             btn.disabled = true;
-            btn.textContent = '充值中…';
+            btn.textContent = '请求支付中…';
+            // 必须在用户点击的同步阶段打开窗口；若在 await fetch 之后再 open，会被当成非用户手势弹窗而拦截或无法写入。
+            var payWindow = window.open('about:blank', '_blank');
+            if (!payWindow) {
+                submitting = false;
+                btn.disabled = false;
+                btn.textContent = '确认充值';
+                alert('请允许本站弹窗后重试（浏览器地址栏旁可设置允许弹窗）');
+                return;
+            }
             try {
+                payWindow.document.open();
+                payWindow.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>正在跳转支付</title></head><body style="font-family:sans-serif;padding:24px;">正在请求支付，请稍候…</body></html>');
+                payWindow.document.close();
                 var res = await fetch(API + '/api/transaction', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + token
                     },
-                    body: JSON.stringify({ transactionAmount: n })
+                    body: JSON.stringify({ transactionAmount: n, payChannel: selectedChannel })
                 });
                 var data = await res.json();
                 if (res.status === 401 || res.status === 403) {
+                    payWindow.close();
                     localStorage.removeItem('token');
                     location.href = 'login.html';
                     return;
                 }
+                if (res.status === 503 && data.payChannel === 'wechat') {
+                    payWindow.close();
+                    alert(data.message || '微信支付即将开通');
+                    return;
+                }
                 if (!res.ok) {
+                    payWindow.close();
                     alert(data.message || '充值失败');
                     return;
                 }
-                var nb = data.data && (data.data.customerBalanceAfter != null ? data.data.customerBalanceAfter : data.data.newBalance);
-                alert('充值成功！当前余额：' + formatCoin(nb));
-                document.getElementById('bal').textContent = formatCoin(nb);
-                document.getElementById('amount').value = '';
-                document.querySelectorAll('.quick button').forEach(function (x) { x.classList.remove('active'); });
+                var payUrl = data.payUrl;
+                if (!payUrl || typeof payUrl !== 'string') {
+                    payWindow.close();
+                    alert('未获取到支付表单，请稍后重试');
+                    return;
+                }
+                payWindow.document.open();
+                payWindow.document.write(payUrl);//将支付宝的支付表单写入到新窗口中
+                payWindow.document.close();
+                document.getElementById('payOverlay').classList.add('show');
+                loadBal();
             } catch (e) {
+                try { payWindow.close(); } catch (e2) {}
                 alert('网络错误');
             } finally {
                 submitting = false;

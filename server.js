@@ -14,6 +14,7 @@ const reviewRoutes = require('./routes/reviewRoute');         // 客户提交订
 const consultRoutes = require('./routes/consultRoute');      // 顾问列表、顾问详情
 const sequelize = require('./config/database');               // 数据库连接，后面要用来同步表结构
 const transactionRoutes = require('./routes/transactionRoute');    // 充值、余额、充值记录
+const payRoutes = require('./routes/payRoutes');                  // 支付宝/微信等支付回调（无登录）
 const consultantServiceRoutes = require('./routes/consultantService'); // 顾问设置服务价格
 const orderChatHttpRoutes = require('./ws/order-chat/orderChatHttpRoutes'); // 订单聊天 REST（与 ws 实时通道同属 ws/order-chat）
 const orderController = require('./controllers/orderController'); // 订单过期扫描（定时任务）
@@ -39,6 +40,7 @@ app.use('/api/order', orderChatHttpRoutes);      // 聊天相关 REST：/chat/co
 app.use('/api/order', orderRoutes);              // /api/order/* → 订单全流程（纯 HTTP，不含聊天）
 app.use('/api/reviews', reviewRoutes);           // 评价：POST /:orderId、GET 顾问公开/本人订单评价列表等
 app.use('/api/transaction', transactionRoutes);        // /api/transaction/* → 充值相关
+app.use('/api/pay', payRoutes);                        // /api/pay/* → 支付渠道异步通知等
 app.use('/api/consultant/service', consultantServiceRoutes);  // 顾问服务价格
 
 // 根路径：随便访问一下会返回一句 Hello World，用来确认服务已启动
