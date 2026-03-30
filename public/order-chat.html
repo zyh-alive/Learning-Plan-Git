@@ -237,12 +237,12 @@
 
         /**
          * 聊天页应在顶层全屏打开；返回时用 ?panel= 回到对应底栏 Tab，避免 history.back 把 iframe 恢复到空白态。
-         * returnPanel: messages | slot1 | slot2 | profile | settings
+         * returnPanel: messages | slot1 | slot2 | profile（收藏与设置已并入「我的主页」）
          */
         function configureBackNavigation() {
             var backEl = document.getElementById('backLink');
             if (!backEl) return;
-            var allowed = { messages: 1, slot1: 1, slot2: 1, profile: 1, settings: 1 };
+            var allowed = { messages: 1, slot1: 1, slot2: 1, profile: 1 };
             var returnPanel = pageParams.get('returnPanel');
             if (!returnPanel) {
                 try {

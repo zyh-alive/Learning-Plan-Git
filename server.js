@@ -19,6 +19,7 @@ const consultantServiceRoutes = require('./routes/consultantService'); // 顾问
 const orderChatHttpRoutes = require('./ws/order-chat/orderChatHttpRoutes'); // 订单聊天 REST（与 ws 实时通道同属 ws/order-chat）
 const orderController = require('./controllers/orderController'); // 订单过期扫描（定时任务）
 const config = require('./config'); // 含 .env 替换后的 feishu 等（见 config/index.js）
+const collectRoutes = require('./routes/collectRoutes');      // 收藏顾问
 
 // 加载全部模型（与 config.yaml / config/database 同一连接）；再加载角色表映射
 require('./models');
@@ -42,6 +43,7 @@ app.use('/api/reviews', reviewRoutes);           // 评价：POST /:orderId、GE
 app.use('/api/transaction', transactionRoutes);        // /api/transaction/* → 充值相关
 app.use('/api/pay', payRoutes);                        // /api/pay/* → 支付渠道异步通知等
 app.use('/api/consultant/service', consultantServiceRoutes);  // 顾问服务价格
+app.use('/api/collects', collectRoutes);                        // 收藏顾问
 
 // 根路径：随便访问一下会返回一句 Hello World，用来确认服务已启动
 app.get('/', (req, res) => {

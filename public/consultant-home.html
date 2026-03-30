@@ -33,12 +33,40 @@
             overflow: hidden;
         }
         .hero {
+            position: relative;
             display: flex;
             align-items: center;
             gap: 18px;
             margin-bottom: 20px;
             padding-bottom: 20px;
             border-bottom: 1px solid #f0f0f0;
+        }
+        /* 顾客端收藏：亮 = 已收藏，灰 = 未收藏 */
+        .collect-fab {
+            position: absolute;
+            top: 0;
+            right: 0;
+            z-index: 2;
+            border: none;
+            background: rgba(255,255,255,0.92);
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            transition: transform 0.15s, box-shadow 0.2s;
+        }
+        .collect-fab:active { transform: scale(0.94); }
+        .collect-fab .heart-icon {
+            font-size: 22px;
+            line-height: 1;
+            color: #d9d9d9;
+        }
+        .collect-fab.is-on .heart-icon {
+            color: #ff4d4f;
         }
         .hero-avatar {
             flex-shrink: 0;
@@ -495,6 +523,8 @@
                     main.innerHTML =
                         '<div class="card">' +
                         '<div class="hero">' +
+                        '<button type="button" class="collect-fab" id="collectHeart" aria-pressed="false" title="收藏顾问" aria-label="收藏顾问">' +
+                        '<span class="heart-icon">♥</span></button>' +
                         '<div class="hero-avatar">💼</div>' +
                         '<div class="hero-main">' +
                         '<h1>' + esc(name) + '</h1>' +
@@ -584,6 +614,66 @@
                     } catch (e2) {
                         if (listHost) listHost.innerHTML = '<p class="review-empty">加载失败</p>';
                     }
+
+                    (function setupCollectHeart() {
+                        var heartBtn = document.getElementById('collectHeart');
+                        if (!heartBtn) return;
+                        var collected = false;
+                        function applyUi() {
+                            heartBtn.classList.toggle('is-on', collected);
+                            heartBtn.setAttribute('aria-pressed', collected ? 'true' : 'false');
+                            heartBtn.title = collected ? '已收藏，点击取消' : '点击收藏';
+                        }
+                        fetch(API_BASE + '/api/collects/list', {
+                            headers: { 'Authorization': 'Bearer ' + token }
+                        })
+                            .then(function (r) {
+                                return r.json().then(function (j) {
+                                    return { ok: r.ok, j: j };
+                                });
+                            })
+                            .then(function (pack) {
+                                if (!pack.ok) return;
+                                var arr = pack.j.collects || [];
+                                collected = arr.some(function (row) {
+                                    return Number(row.consultantId) === id;
+                                });
+                                applyUi();
+                            })
+                            .catch(function () {});
+
+                        heartBtn.addEventListener('click', function (ev) {
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            var url = collected
+                                ? API_BASE + '/api/collects/delete'
+                                : API_BASE + '/api/collects/add';
+                            fetch(url, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'Bearer ' + token
+                                },
+                                body: JSON.stringify({ consultantId: id })
+                            })
+                                .then(function (r) {
+                                    return r.json().then(function (j) {
+                                        return { ok: r.ok, j: j };
+                                    });
+                                })
+                                .then(function (pack) {
+                                    if (!pack.ok) {
+                                        alert(pack.j.message || '操作失败');
+                                        return;
+                                    }
+                                    collected = !collected;
+                                    applyUi();
+                                })
+                                .catch(function () {
+                                    alert('网络错误');
+                                });
+                        });
+                    })();
                 } catch (e) {
                     main.innerHTML = '<p class="err">网络错误</p>';
                 }

@@ -18,8 +18,38 @@
             display: flex;
             justify-content: flex-end;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 14px;
             min-height: 28px;
+        }
+        .toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .toolbar-pill {
+            font-size: 13px;
+            font-weight: 700;
+            color: #5a67d8;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 10px;
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.25);
+        }
+        .toolbar-pill:hover {
+            background: rgba(102, 126, 234, 0.16);
+            color: #4c51bf;
+        }
+        body.consultant-theme .toolbar-pill {
+            color: #e9d5ff;
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.22);
+        }
+        body.consultant-theme .toolbar-pill:hover {
+            background: rgba(255, 255, 255, 0.14);
+            color: #fff;
         }
         .bill-link {
             font-size: 14px;
@@ -44,35 +74,54 @@
             background: rgba(255, 255, 255, 0.14);
             color: #fff;
         }
-        .greeting {
-            text-align: center;
-            font-size: 15px;
-            font-weight: 600;
-            color: #4a5568;
-            margin-bottom: 20px;
-            letter-spacing: 0.06em;
+        /* 用户端：头像与标题同卡片，避免单独悬在顶部 */
+        .profile-hero-card {
+            background: #fff;
+            border-radius: 20px;
+            padding: 18px 18px 20px;
+            margin-bottom: 18px;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: 0 4px 22px rgba(15, 23, 42, 0.07);
         }
-        .profile-head {
-            text-align: center;
-            margin-bottom: 20px;
+        .profile-hero-inner {
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
-        .avatar {
-            width: 72px;
-            height: 72px;
-            margin: 0 auto 12px;
+        .profile-hero-card .avatar {
+            width: 64px;
+            height: 64px;
+            margin: 0;
+            flex-shrink: 0;
             border-radius: 50%;
+            border: 3px solid #f0f4ff;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 36px;
-            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.35);
+            font-size: 30px;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.35);
         }
-        .profile-head h1 {
+        .profile-hero-text {
+            flex: 1;
+            min-width: 0;
+            text-align: left;
+        }
+        .profile-hero-text .greeting {
+            margin: 0 0 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #718096;
+            letter-spacing: 0.04em;
+            text-align: left;
+        }
+        .profile-hero-text h1 {
             margin: 0;
-            font-size: 22px;
-            font-weight: 700;
+            font-size: 21px;
+            font-weight: 800;
             color: #1a202c;
+            letter-spacing: -0.02em;
+            line-height: 1.25;
         }
         /* 客户端：金币独立入口 */
         .coin-wallet {
@@ -110,6 +159,101 @@
             letter-spacing: -0.02em;
         }
         .coin-wallet .sub { font-size: 13px; color: rgba(0,0,0,0.45); margin-top: 4px; }
+        /* 嵌入主页时：仅「我的收藏」大卡片 */
+        .home-hub {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .hub-card {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            text-decoration: none;
+            color: inherit;
+            border-radius: 18px;
+            padding: 18px 16px 16px;
+            min-height: 112px;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: 0 4px 22px rgba(15, 23, 42, 0.07);
+            transition: transform 0.18s ease, box-shadow 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .hub-card::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            opacity: 0.12;
+            pointer-events: none;
+        }
+        .hub-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+        }
+        .hub-collect {
+            background: linear-gradient(145deg, #fff8f8 0%, #ffe8ea 40%, #ffffff 100%);
+        }
+        .hub-collect::after { background: #ff4d4f; }
+        .hub-card .hub-icon {
+            font-size: 26px;
+            line-height: 1;
+            margin-bottom: 10px;
+        }
+        .hub-card .hub-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1a202c;
+            letter-spacing: 0.02em;
+        }
+        .hub-card .hub-desc {
+            font-size: 12px;
+            color: #718096;
+            margin-top: 5px;
+            line-height: 1.45;
+        }
+        .hub-card .hub-arrow {
+            margin-top: auto;
+            padding-top: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #667eea;
+        }
+        .hub-badge {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            background: linear-gradient(135deg, #ff4d4f, #ff7875);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 800;
+            min-width: 22px;
+            height: 22px;
+            line-height: 22px;
+            border-radius: 11px;
+            text-align: center;
+            padding: 0 7px;
+            box-shadow: 0 2px 8px rgba(255, 77, 79, 0.45);
+        }
+        .hub-badge.is-zero {
+            background: #e2e8f0;
+            color: #64748b;
+            box-shadow: none;
+            font-weight: 700;
+        }
+        body.consultant-theme .hub-card {
+            background: rgba(255, 255, 255, 0.97) !important;
+            border-color: rgba(226, 232, 240, 0.9);
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+        }
+        body.consultant-theme .hub-card:hover {
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+        }
         .section {
             background: #fff;
             border-radius: 16px;
@@ -164,39 +308,23 @@
             border: 2px solid #e9e6ff;
         }
         .btn-outline:hover { background: #f7f5ff; }
-        .to-settings {
-            display: block;
-            text-align: center;
-            margin-top: 20px;
-            font-size: 14px;
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 600;
-        }
-        .to-settings:hover { text-decoration: underline; }
-        body.embed .to-settings,
-        body.embed .greeting,
         body.embed .btn-back-dash { display: none; }
         body.embed { padding-top: 12px; padding-bottom: 16px; }
         .list.hidden { display: none; }
+        .hidden { display: none !important; }
 
         /* 顾问端：与客户端「顾问主页」同系视觉 */
         body.consultant-theme {
             background: linear-gradient(165deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
             padding-bottom: 48px;
         }
-        body.consultant-theme .greeting {
-            color: rgba(255,255,255,0.88);
-        }
-        body.consultant-theme .profile-head,
+        body.consultant-theme .profile-hero-card,
         body.consultant-theme .coin-wallet { display: none !important; }
         body.consultant-theme .btn-primary.btn-back-dash {
             background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.08));
             border: 1px solid rgba(255,255,255,0.25);
             box-shadow: none;
         }
-        body.consultant-theme .to-settings { color: #c4b5fd; }
-
         .cp-outer { max-width: 420px; margin: 0 auto 18px; }
         .cp-card {
             background: #fff;
@@ -374,12 +502,19 @@
     <script src="js/embed-parent-nav.js"></script>
     <div class="page">
         <div class="profile-toolbar">
-            <a href="bill-history.html" class="bill-link" id="billLink">账单</a>
+            <div class="toolbar-actions">
+                <a href="settings.html" class="toolbar-pill" id="toolbarSettings">⚙️ 设置</a>
+                <a href="bill-history.html" class="bill-link" id="billLink">账单</a>
+            </div>
         </div>
-        <p class="greeting" id="greeting">尊敬的客户您好</p>
-        <div class="profile-head">
-            <div class="avatar" id="avatarIcon">👤</div>
-            <h1>个人资料</h1>
+        <div id="userHeroTop" class="profile-hero-card">
+            <div class="profile-hero-inner">
+                <div class="avatar" id="avatarIcon">👤</div>
+                <div class="profile-hero-text">
+                    <p class="greeting" id="greeting">尊敬的客户您好</p>
+                    <h1 id="profilePageTitle">个人资料</h1>
+                </div>
+            </div>
         </div>
 
         <a href="coin-wallet.html" class="coin-wallet hidden" id="coinWallet">
@@ -390,6 +525,16 @@
             <div class="balance" id="walletCoin">0</div>
             <div class="sub">充值 · 提现 · 记录 ›</div>
         </a>
+
+        <div id="clientHomeHub" class="home-hub hidden">
+            <a href="collects-list.html" class="hub-card hub-collect" id="hubCollectLink" aria-label="我的收藏">
+                <span class="hub-badge is-zero" id="collectCountBadge">0</span>
+                <span class="hub-icon" aria-hidden="true">♥</span>
+                <span class="hub-title">我的收藏</span>
+                <span class="hub-desc">查看已收藏的顾问</span>
+                <span class="hub-arrow">进入 ›</span>
+            </a>
+        </div>
 
         <div class="list hidden" id="clientList">
             <div class="section">
@@ -453,7 +598,6 @@
         <div class="actions">
             <button type="button" class="btn btn-primary btn-back-dash" id="btnBackDash">返回主页</button>
         </div>
-        <a href="settings.html" class="to-settings" id="toSettings">⚙️ 打开设置（编辑资料、修改密码、退出登录、注销账号）</a>
     </div>
     <script>
         var API_BASE = window.location.origin;
@@ -502,8 +646,14 @@
             if (cpEnt) cpEnt.setAttribute('href', 'coin-wallet.html' + embQs);
             var bill = document.getElementById('billLink');
             if (bill) bill.setAttribute('href', 'bill-history.html' + embQs);
-            var toSt = document.getElementById('toSettings');
-            if (toSt) toSt.setAttribute('href', 'settings.html' + embQs);
+            var tbarSet = document.getElementById('toolbarSettings');
+            if (tbarSet) tbarSet.setAttribute('href', 'settings.html' + embQs);
+            var hCollect = document.getElementById('hubCollectLink');
+            if (hCollect) hCollect.setAttribute('href', 'collects-list.html' + embQs);
+            var titleEl = document.getElementById('profilePageTitle');
+            if (titleEl && document.body.classList.contains('embed')) {
+                titleEl.textContent = '我的主页';
+            }
         })();
 
         if (!token) {
@@ -515,6 +665,10 @@
             document.body.classList.toggle('consultant-theme', role === 'consultant');
             document.getElementById('clientList').classList.toggle('hidden', role === 'consultant');
             document.getElementById('consultantList').classList.toggle('hidden', role !== 'consultant');
+            var chub = document.getElementById('clientHomeHub');
+            if (chub) chub.classList.toggle('hidden', role !== 'user');
+            var userHero = document.getElementById('userHeroTop');
+            if (userHero) userHero.classList.toggle('hidden', role === 'consultant');
             if (role === 'user') {
                 document.getElementById('coinWallet').classList.remove('hidden');
             }
@@ -603,6 +757,21 @@
                         document.getElementById('c_bio').classList.toggle('empty', !u.bio);
                         document.getElementById('c_about').textContent = u.about || '未填写';
                         document.getElementById('c_about').classList.toggle('empty', !u.about);
+
+                        try {
+                            var cr = await fetch(API_BASE + '/api/collects/list', {
+                                headers: { 'Authorization': 'Bearer ' + token }
+                            });
+                            var cj = await cr.json();
+                            if (cr.ok) {
+                                var n = (cj.collects && cj.collects.length) || 0;
+                                var badge = document.getElementById('collectCountBadge');
+                                if (badge) {
+                                    badge.textContent = String(n);
+                                    badge.classList.toggle('is-zero', n === 0);
+                                }
+                            }
+                        } catch (eC) {}
                     }
                 } catch (err) {
                     alert('网络错误：' + (err.message || '请检查后端是否运行'));

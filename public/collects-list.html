@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的收藏</title>
+    <style>
+        * { box-sizing: border-box; }
+        html.embed-in-dashboard, html.embed-in-dashboard body { height: 100%; min-height: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            background: #f5f5f5;
+            padding: 16px;
+            padding-bottom: 32px;
+        }
+        body.embed-in-dashboard { padding-bottom: 16px; }
+        .top {
+            max-width: 560px;
+            margin: 0 auto 16px;
+        }
+        .top h1 {
+            margin: 0 0 6px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+        .count-line {
+            font-size: 14px;
+            color: #666;
+        }
+        .count-line strong { color: #ff4d4f; font-weight: 700; }
+        .list-wrap { max-width: 560px; margin: 0 auto; }
+        .item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            padding: 12px 14px;
+            margin-bottom: 10px;
+        }
+        .item-main {
+            flex: 1;
+            min-width: 0;
+            cursor: pointer;
+            padding: 4px 0;
+        }
+        .item-name { font-size: 17px; font-weight: 600; color: #1a1a1a; }
+        .item-sub { font-size: 12px; color: #999; margin-top: 4px; }
+        .item-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+        .heart-btn {
+            flex-shrink: 0;
+            border: none;
+            background: transparent;
+            font-size: 26px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 10px;
+            transition: background 0.15s;
+        }
+        .heart-btn:active { background: rgba(0,0,0,0.06); }
+        .heart-btn .heart-icon { color: #d9d9d9; }
+        .heart-btn.is-on .heart-icon { color: #ff4d4f; }
+        .empty, .err {
+            text-align: center;
+            padding: 40px 16px;
+            color: #888;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .err { color: #cf1322; }
+    </style>
+</head>
+<body>
+    <div class="top">
+        <h1>我的收藏</h1>
+        <p class="count-line">共收藏 <strong id="colCount">0</strong> 位顾问</p>
+    </div>
+    <div class="list-wrap" id="listHost"><p class="empty">加载中…</p></div>
+    <script>
+        var API = window.location.origin;
+        var token = localStorage.getItem('token');
+        var params = new URLSearchParams(location.search);
+        var embed = params.get('embed') === '1';
+        if (embed) document.documentElement.classList.add('embed-in-dashboard');
+        if (embed) document.body.classList.add('embed-in-dashboard');
+
+        function esc(t) {
+            return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        }
+        function getRole() {
+            try {
+                var b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+                return JSON.parse(decodeURIComponent(escape(atob(b64)))).role;
+            } catch (e) { return ''; }
+        }
+        if (!token || getRole() !== 'user') {
+            window.location.href = 'login.html';
+        } else {
+            function openConsultant(cid) {
+                var q = embed ? '?id=' + cid + '&embed=1' : '?id=' + cid;
+                window.location.href = 'consultant-home.html' + q;
+            }
+
+            async function toggleCollect(cid, btn) {
+                var on = btn.classList.contains('is-on');
+                var url = on ? API + '/api/collects/delete' : API + '/api/collects/add';
+                try {
+                    var res = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + token
+                        },
+                        body: JSON.stringify({ consultantId: cid })
+                    });
+                    var data = await res.json();
+                    if (!res.ok) {
+                        alert(data.message || '操作失败');
+                        return;
+                    }
+                    btn.classList.toggle('is-on', !on);
+                    if (on) {
+                        var row = btn.closest('.item');
+                        if (row) row.remove();
+                        var n = document.querySelectorAll('.item').length;
+                        document.getElementById('colCount').textContent = String(n);
+                        if (n === 0) {
+                            document.getElementById('listHost').innerHTML =
+                                '<p class="empty">暂无收藏，去顾问列表逛逛吧</p>';
+                        }
+                    }
+                } catch (e) {
+                    alert('网络错误');
+                }
+            }
+
+            (async function () {
+                var host = document.getElementById('listHost');
+                try {
+                    var lr = await fetch(API + '/api/collects/list', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    var lj = await lr.json();
+                    if (lr.status === 401 || lr.status === 403) {
+                        localStorage.removeItem('token');
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    if (!lr.ok) {
+                        host.innerHTML = '<p class="err">' + esc(lj.message || '加载失败') + '</p>';
+                        return;
+                    }
+                    var rows = lj.collects || [];
+                    document.getElementById('colCount').textContent = String(rows.length);
+                    if (rows.length === 0) {
+                        host.innerHTML = '<p class="empty">暂无收藏，去「顾问列表」点心形即可收藏</p>';
+                        return;
+                    }
+                    var details = await Promise.all(
+                        rows.map(function (r) {
+                            var cid = r.consultantId != null ? Number(r.consultantId) : NaN;
+                            return fetch(API + '/api/consultants/' + cid, {
+                                headers: { 'Authorization': 'Bearer ' + token }
+                            }).then(function (res) {
+                                return res.json().then(function (j) {
+                                    return { ok: res.ok, cid: cid, j: j };
+                                });
+                            });
+                        })
+                    );
+                    host.innerHTML = details
+                        .map(function (d) {
+                            var name = '顾问 #' + d.cid;
+                            var c = (d.j && d.j.data) || {};
+                            if (d.ok && c.name) name = String(c.name).trim() || name;
+                            return (
+                                '<div class="item" data-cid="' +
+                                d.cid +
+                                '">' +
+                                '<div class="item-avatar">💼</div>' +
+                                '<div class="item-main" data-role="go">' +
+                                '<div class="item-name">' +
+                                esc(name) +
+                                '</div>' +
+                                '<div class="item-sub">编号 #' +
+                                d.cid +
+                                '</div></div>' +
+                                '<button type="button" class="heart-btn is-on" data-cid="' +
+                                d.cid +
+                                '" title="取消收藏" aria-label="取消收藏">' +
+                                '<span class="heart-icon">♥</span></button></div>'
+                            );
+                        })
+                        .join('');
+
+                    host.querySelectorAll('.item-main[data-role="go"]').forEach(function (el) {
+                        el.addEventListener('click', function () {
+                            var item = el.closest('.item');
+                            if (!item) return;
+                            openConsultant(item.getAttribute('data-cid'));
+                        });
+                    });
+                    host.querySelectorAll('.heart-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            var cid = parseInt(btn.getAttribute('data-cid'), 10);
+                            if (cid) toggleCollect(cid, btn);
+                        });
+                    });
+                } catch (e) {
+                    host.innerHTML = '<p class="err">网络错误</p>';
+                }
+            })();
+        }
+    </script>
+</body>
+</html>

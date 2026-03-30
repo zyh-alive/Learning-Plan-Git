@@ -335,7 +335,6 @@
         .dock-icon.icon-service { background: linear-gradient(145deg, #d1fae5, #a7f3d0); }
         .dock-icon.icon-hub { background: linear-gradient(145deg, #fef3c7, #fde68a); }
         .dock-icon.icon-profile { background: linear-gradient(145deg, #fce7f3, #fbcfe8); }
-        .dock-icon.icon-settings { background: linear-gradient(145deg, #e2e8f0, #cbd5e1); }
 
         .status-foot {
             margin-top: 10px;
@@ -382,11 +381,6 @@
                         <iframe class="embed-frame" id="iframeProfile" title="我的资料"></iframe>
                     </div>
                 </div>
-                <div class="panel" id="panel-settings" role="tabpanel" hidden>
-                    <div class="panel-embed">
-                        <iframe class="embed-frame" id="iframeSettings" title="设置"></iframe>
-                    </div>
-                </div>
             </div>
 
             <nav class="dock-bar" aria-label="主导航">
@@ -406,16 +400,12 @@
                 <button type="button" class="dock-item" data-panel="profile" id="dockProfile">
                     <span class="red-dot" id="redDot"></span>
                     <div class="dock-icon icon-profile">👤</div>
-                    <span class="dock-label">我的资料</span>
-                </button>
-                <button type="button" class="dock-item" data-panel="settings" id="dockSettings">
-                    <div class="dock-icon icon-settings">⚙️</div>
-                    <span class="dock-label">设置</span>
+                    <span class="dock-label">我的主页</span>
                 </button>
             </nav>
         </div>
     </div>
-    <p class="status-foot">已登录 · 编辑资料与退出请在「设置」</p>
+    <p class="status-foot">已登录 · 收藏与设置请打开「我的主页」</p>
 
     <script>
         var API = window.location.origin;
@@ -448,8 +438,7 @@
                 messages: 'panel-messages',
                 slot1: 'panel-slot1',
                 slot2: 'panel-slot2',
-                profile: 'panel-profile',
-                settings: 'panel-settings'
+                profile: 'panel-profile'
             };
             Object.keys(ids).forEach(function (key) {
                 var el = document.getElementById(ids[key]);
@@ -467,17 +456,20 @@
             if (name === 'profile') {
                 var f = document.getElementById('iframeProfile');
                 var pUrl = 'profile.html?embed=1';
-                if (f && f.dataset.loaded !== pUrl) {
-                    f.src = pUrl;
-                    f.dataset.loaded = pUrl;
-                }
-            }
-            if (name === 'settings') {
-                var s = document.getElementById('iframeSettings');
-                var sUrl = 'settings.html?embed=1';
-                if (s && s.dataset.loaded !== sUrl) {
-                    s.src = sUrl;
-                    s.dataset.loaded = sUrl;
+                if (f) {
+                    var needReload = f.dataset.loaded !== pUrl;
+                    try {
+                        var loc = f.contentWindow && f.contentWindow.location;
+                        if (loc && loc.pathname && loc.pathname.indexOf('profile.html') === -1) {
+                            needReload = true;
+                        }
+                    } catch (e) {
+                        needReload = true;
+                    }
+                    if (needReload) {
+                        f.src = pUrl;
+                        f.dataset.loaded = pUrl;
+                    }
                 }
             }
             if (name === 'slot1') {
@@ -868,7 +860,7 @@
                 }
             });
 
-            var allowedStart = ['messages', 'slot1', 'slot2', 'profile', 'settings'];
+            var allowedStart = ['messages', 'slot1', 'slot2', 'profile'];
             var startParams = new URLSearchParams(window.location.search);
             var startPanel = startParams.get('panel') || 'messages';
             if (allowedStart.indexOf(startPanel) === -1) startPanel = 'messages';

@@ -63,7 +63,7 @@
         var token = localStorage.getItem('token');
         var payParams = new URLSearchParams(location.search);
         var id = parseInt(payParams.get('id'), 10);
-        var allowedPanels = ['messages', 'slot1', 'slot2', 'profile', 'settings'];
+        var allowedPanels = ['messages', 'slot1', 'slot2', 'profile'];
         var returnPanelCancel = String(payParams.get('returnPanel') || 'slot2').toLowerCase();
         if (allowedPanels.indexOf(returnPanelCancel) < 0) returnPanelCancel = 'slot2';
 

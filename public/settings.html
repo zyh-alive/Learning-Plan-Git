@@ -22,8 +22,52 @@
             min-height: 0;
         }
         .page { max-width: 420px; margin: 0 auto; }
+        .embed-top {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        body.embed .embed-top { display: flex; }
+        .btn-back-home {
+            flex-shrink: 0;
+            border: none;
+            background: #fff;
+            color: #475569;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            padding: 8px 12px;
+            margin: -8px 0 -8px -8px;
+            border-radius: 10px;
+            transition: background 0.15s;
+        }
+        .btn-back-home:hover { background: #f1f5f9; color: #0f172a; }
+        .embed-top .embed-title {
+            flex: 1;
+            margin: 0;
+            font-size: 17px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .back-to-dash {
+            display: inline-block;
+            margin-bottom: 14px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #4f46e5;
+            text-decoration: none;
+        }
+        .back-to-dash:hover { text-decoration: underline; }
+        body.embed .back-to-dash { display: none; }
         .head {
             margin-bottom: 18px;
+        }
+        body.embed .head {
+            display: none;
         }
         .head h1 {
             margin: 0;
@@ -82,7 +126,13 @@
     </style>
 </head>
 <body>
+    <script src="js/embed-parent-nav.js"></script>
     <div class="page">
+        <div class="embed-top" id="embedTop" aria-hidden="true">
+            <button type="button" class="btn-back-home" id="btnBackHome" title="返回我的主页">← 返回</button>
+            <h2 class="embed-title">设置</h2>
+        </div>
+        <a href="dashboard.html?panel=profile" class="back-to-dash" id="backToDash">← 返回主页</a>
         <div class="head" id="settingsHead">
             <h1>设置</h1>
             <p>账号与安全</p>
@@ -111,8 +161,8 @@
             var params = new URLSearchParams(window.location.search);
             if (params.get('embed') === '1') {
                 document.body.classList.add('embed');
-                var h = document.getElementById('settingsHead');
-                if (h) h.style.display = 'none';
+                var top = document.getElementById('embedTop');
+                if (top) top.setAttribute('aria-hidden', 'false');
                 var hint = document.getElementById('settingsHint');
                 if (hint) hint.style.marginTop = '8px';
                 var q = '?embed=1';
@@ -122,6 +172,14 @@
                 if (lp) lp.href = 'change-password.html' + q;
             }
         })();
+
+        document.getElementById('btnBackHome').addEventListener('click', function () {
+            if (typeof window.__goDashboard === 'function') {
+                window.__goDashboard('profile');
+            } else {
+                window.location.href = 'dashboard.html?panel=profile';
+            }
+        });
 
         document.getElementById('logoutBtn').addEventListener('click', function () {
             localStorage.removeItem('token');
