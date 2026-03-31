@@ -10,6 +10,8 @@ const OrderReview = require('../models/OrderReview');
 const ConsultantProfile = require('../models/ConsultantProfile');
 const UserProfile = require('../models/UserProfile');
 const Tipping = require('../models/Tipping');
+const cache = require('../utils/cache');
+const CACHE_TTL = require('../utils/cache').CACHE_TTL;
 
 /**
  * 订单+评价列表（两接口共用）
@@ -21,7 +23,13 @@ async function fetchConsultantOrderReviewFeed({ currentUserId=null, consultantId
     if (!Number.isFinite(cid) || cid <= 0) {//isFinite：判断是否为有限数，<=0：小于等于0    
         return { error: '顾问 ID 无效', status: 400 };
     }
-
+    const cacheKey = `consultant:reviews:${cid}:${filter || 'all'}:${currentUserId || 'anon'}`;//cacheKey：缓存键，要根据函数的参数去设置
+    console.log(`🔍 尝试读取缓存: ${cacheKey}`);
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+        console.log(`✅ 缓存命中: ${cacheKey}`);
+        return cached; //如果缓存存在，则返回缓存，不进行数据库查询
+    }
     const profile = await ConsultantProfile.findOne({
         where: { consultantId: cid },
         attributes: ['consultantId']
@@ -94,19 +102,23 @@ async function fetchConsultantOrderReviewFeed({ currentUserId=null, consultantId
         myreviews.sort((a, b) => b.reviewedAt - a.reviewedAt);//降序，最新评价排在最前面
         otherreviews.sort((a, b) => b.reviewedAt - a.reviewedAt);//降序，最新评价排在最前面
         noreviews.sort((a, b) => b.reviewedAt - a.reviewedAt);//降序，最新评价排在最前面
+        await cache.set(cacheKey, { list: [...myreviews, ...otherreviews, ...noreviews], filter }, CACHE_TTL.CONSULTANT_REVIEWS);
         return { list: [...myreviews, ...otherreviews, ...noreviews], filter };//合并排序后的评价订单列表
     }else{
         if(filter === 'reviews_only'){
             const onlyreviews = list.filter(item => item.rating !== null&&item.reviewContent !== null);//筛选出有评价的订单
             onlyreviews.sort((a, b) => b.reviewedAt - a.reviewedAt);//降序，最新评价排在最前面
+            await cache.set(cacheKey, { list: onlyreviews, filter }, CACHE_TTL.CONSULTANT_REVIEWS);
             return { list: onlyreviews, filter };
         }else if(filter === 'tippings_only'){
             const onlytippings = list.filter(item => item.tipAmount !== null);//筛选出有打赏的订单
             onlytippings.sort((a, b) =>b.createdAt- a.createdAt); // 降序，最新打赏排在最前面
+            await cache.set(cacheKey, { list: onlytippings, filter }, CACHE_TTL.CONSULTANT_REVIEWS);
             return { list: onlytippings, filter };
         }
         else{
             const after_sort_list = list.sort((a, b) => b.completedAt - a.completedAt);//降序，最新评价排在最前面
+            await cache.set(cacheKey, { list: after_sort_list, filter }, CACHE_TTL.CONSULTANT_REVIEWS);
             return { list: after_sort_list, filter };
         }
     }
@@ -174,11 +186,11 @@ exports.listOwnerConsultantReviewsFeed = async (req, res) => {
             return res.status(403).json({ message: '仅顾问可查看' });
         }
 
-        //const raw = (req.query.filter || 'reviews_only').toLowerCase();//raw：原始查询条件，toLowerCase：转换为小写
-        //const filter = raw === 'all' ? 'all' : 'reviews_only';//filter：过滤条件，'all'：包含待评价和已评价，'reviews_only'：仅包含已评价和没有评价，'reviews_only'：仅包含已评价
+        const raw = (req.query.filter || 'reviews_only').toLowerCase();//raw：原始查询条件，toLowerCase：转换为小写
+        const filter = raw === 'all' ? 'all' : 'reviews_only';//filter：过滤条件，'all'：包含待评价和已评价，'reviews_only'：仅包含已评价和没有评价，'reviews_only'：仅包含已评价
         const result_filter =await fetchConsultantOrderReviewFeed({
             consultantId: Number(cid),
-            filter: 'reviews_only'
+            filter: filter
         });
         if (result_filter.error) {//error：错误信息
             return res.status(result_filter.status).json({ message: result_filter.error });
@@ -198,9 +210,11 @@ exports.listOwnerConsultantTippingsFeed = async (req, res) => {
         if (role !== 'consultant' || cid == null) {//role：角色，'consultant'：顾问，'user'：顾客
             return res.status(403).json({ message: '仅顾问可查看' });
         }
+        const raw = (req.query.filter || 'tippings_only').toLowerCase();//raw：原始查询条件，toLowerCase：转换为小写
+        const filter = raw === 'all' ? 'all' : 'tippings_only';//filter：过滤条件，'all'：包含待评价和已评价，'tippings_only'：仅包含已打赏
         const result_tippings = await fetchConsultantOrderReviewFeed({
             consultantId: Number(cid),
-            filter: 'tippings_only'
+            filter: filter
         });
         if (result_tippings.error) {//error：错误信息
             return res.status(result_tippings.status).json({ message: result_tippings.error });
@@ -309,7 +323,8 @@ exports.submitReview = async (req, res) => {
             }
             throw e;
         }
-
+        // 删除匹配 pattern 的所有缓存
+        await cache.delPattern(`consultant:reviews:*`);//删除所有顾问评价列表缓存
         res.json({
             message: '评价成功，订单已完成',
             data: { orderId: order.orderId, status: order.status, completedAt: order.completedAt }

@@ -754,7 +754,7 @@
                             'consultant-tippings-feed.html' + (document.body.classList.contains('embed') ? '?embed=1' : '');
                         var tipN = 0;
                         try {
-                            var tr = await fetch(API_BASE + '/api/reviews/consultant/tippings-review-feed', {
+                            var tr = await fetch(API_BASE + '/api/reviews/consultant/tippings-review-feed?filter=tippings_only', {
                                 headers: { 'Authorization': 'Bearer ' + token }
                             });
                             var tj = await tr.json().catch(function () { return {}; });

@@ -252,7 +252,7 @@
                     var url =
                         filter === 'all'
                             ? API + '/api/reviews/consultant/orders-review-feed?filter=all'
-                            : API + '/api/reviews/consultant/reviews-review-feed';
+                            : API + '/api/reviews/consultant/reviews-review-feed?filter=reviews_only';
                     var res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
                     var j = await res.json();
                     if (res.status === 401 || res.status === 403) {
