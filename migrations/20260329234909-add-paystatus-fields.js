@@ -3,6 +3,14 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   up: async (queryInterface, Sequelize) => {
+    const desc = await queryInterface.describeTable('fund_transactions');
+    const has =
+      Object.keys(desc).some((k) => k.toLowerCase() === 'pay_status') ||
+      Object.keys(desc).some((k) => k === 'payStatus');
+    if (has) {
+      console.log('⏭️  pay_status / payStatus 已存在，跳过 addColumn');
+      return;
+    }
     await queryInterface.addColumn('fund_transactions', 'payStatus', {
       type: Sequelize.ENUM('pending', 'success', 'failed'),
       allowNull: false,
@@ -13,6 +21,11 @@ module.exports = {
   },
 
   down: async (queryInterface, Sequelize) => {
+    const desc = await queryInterface.describeTable('fund_transactions');
+    if (!Object.keys(desc).includes('payStatus')) {
+      console.log('⏭️  无 payStatus 列，跳过 removeColumn');
+      return;
+    }
     await queryInterface.removeColumn('fund_transactions', 'payStatus');
     console.log('❌ 已删除 payStatus 字段从 FundTransactions 表');
   }

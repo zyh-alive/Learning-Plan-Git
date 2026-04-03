@@ -3,36 +3,61 @@ const FundTransaction = require('../models/FundTransaction');
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    //duplicateRows:查询出重复的merchantOrderId
-    const [duplicateRows] = await queryInterface.sequelize.query(//数组对象[['merchantOrderId1', 'merchantOrderId2', 'merchantOrderId3'], ...]
-      'SELECT merchant_order_id FROM fund_transactions GROUP BY merchant_order_id HAVING COUNT(*) > 1'
-    );//按商户号分组，然后挑出记录大于1的
+    const desc = await queryInterface.describeTable('fund_transactions');
+    const merKey =
+      Object.keys(desc).find((k) => k.toLowerCase() === 'merchant_order_id') ||
+      Object.keys(desc).find((k) => k.toLowerCase() === 'merchantorderid');
+    if (!merKey) {
+      console.log('⏭️  无商户订单号列，跳过去重与索引');
+      return;
+    }
+
+    const [idxRows] = await queryInterface.sequelize.query(
+      'SHOW INDEX FROM fund_transactions WHERE Non_unique = 0 AND Column_name = ?',
+      { replacements: [merKey] }
+    );
+    if (idxRows && idxRows.length > 0) {
+      console.log('⏭️  商户订单号列已有唯一索引，跳过去重与 addIndex');
+      return;
+    }
+
+    const qCol = '`' + String(merKey).replace(/`/g, '``') + '`';
+    const [duplicateRows] = await queryInterface.sequelize.query(
+      `SELECT ${qCol} AS mer_val FROM fund_transactions WHERE ${qCol} IS NOT NULL GROUP BY ${qCol} HAVING COUNT(*) > 1`
+    );
     if (duplicateRows.length > 0) {
       for (const row of duplicateRows) {
-        const keep = await FundTransaction.findOne({//永远只取出最新的一条
-          where: {
-            merchant_order_id: row.merchant_order_id},//按商户号查询
-            order: [['transactionId', 'DESC']],//按transactionId降序，取最新的一条
-            attributes: ['transactionId']
+        const val = row.mer_val;
+        const keep = await FundTransaction.findOne({
+          where: { merchantOrderId: val },
+          order: [['transactionId', 'DESC']],
+          attributes: ['transactionId']
         });
-        if (keep) {//如果最新的一条存在，则删除其余的重复的记录
-          await FundTransaction.destroy({//sequelize的删除方法
+        if (keep) {
+          await FundTransaction.destroy({
             where: {
-              merchant_order_id: row.merchant_order_id,
-              transactionId: {
-                [Sequelize.Op.ne]: keep.transactionId//.ne:不包括最新的一条，其余删除
-              }
+              merchantOrderId: val,
+              transactionId: { [Sequelize.Op.ne]: keep.transactionId }
             }
-          }); //删除重复的记录，除了最新的一条
+          });
         }
       }
-      console.log(`✅ 已删除 ${duplicateRows.length} 条重复的记录，现在可以添加唯一索引`);
+      console.log(`✅ 已删除 ${duplicateRows.length} 组重复商户号记录，现在可以添加唯一索引`);
     }
-    await queryInterface.addIndex('fund_transactions', ['merchant_order_id'], { unique: true });
+    await queryInterface.addIndex('fund_transactions', [merKey], { unique: true });
     console.log('✅ 已添加唯一索引');
   },
 
   down: async (queryInterface, Sequelize) => {
-    await queryInterface.removeIndex('fund_transactions', ['merchant_order_id']);
+    const desc = await queryInterface.describeTable('fund_transactions');
+    const merKey =
+      Object.keys(desc).find((k) => k.toLowerCase() === 'merchant_order_id') ||
+      Object.keys(desc).find((k) => k.toLowerCase() === 'merchantorderid');
+    if (!merKey) return;
+    try {
+      await queryInterface.removeIndex('fund_transactions', [merKey]);
+    } catch (e) {
+      console.log('⏭️  removeIndex 商户订单号 跳过（可能未由本迁移创建）');
+    }
   }
 };

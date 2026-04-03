@@ -3,6 +3,16 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   up: async (queryInterface, Sequelize) => {
+    const desc = await queryInterface.describeTable('fund_transactions');
+    const keys = Object.keys(desc);
+    const hasPayCols =
+      keys.some((k) => k.toLowerCase() === 'merchant_order_id') ||
+      keys.some((k) => k.toLowerCase() === 'merchantorderid');
+    if (hasPayCols) {
+      console.log('⏭️  paydetails 列已存在（如 baseline 已建表），跳过 addColumn');
+      return;
+    }
+
     await queryInterface.addColumn('fund_transactions', 'merchantOrderId', {
       //添加商户订单号字段
       type: Sequelize.INTEGER,
@@ -28,6 +38,16 @@ module.exports = {
   },
 
   down: async (queryInterface, Sequelize) => {
+    const desc = await queryInterface.describeTable('fund_transactions');
+    const keys = Object.keys(desc);
+    const hasCamel =
+      keys.some((k) => k === 'tradeType') ||
+      keys.some((k) => k === 'alipayTradeNo') ||
+      keys.some((k) => k === 'merchantOrderId');
+    if (!hasCamel) {
+      console.log('⏭️  无 camelCase 支付列，跳过 removeColumn');
+      return;
+    }
     await queryInterface.removeColumn('fund_transactions', 'tradeType');
     await queryInterface.removeColumn('fund_transactions', 'alipayTradeNo');
     await queryInterface.removeColumn('fund_transactions', 'merchantOrderId');

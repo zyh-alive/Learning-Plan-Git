@@ -3,6 +3,12 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   up: async (queryInterface, Sequelize) => {
+    const tables = await queryInterface.showAllTables();
+    const names = tables.map((t) => (typeof t === 'object' && t.tableName ? t.tableName : t));
+    if (names.includes('tippings')) {
+      console.log('⏭️  tippings 表已存在，跳过 createTable');
+      return;
+    }
     await queryInterface.createTable('tippings', {
       id: {
         type: Sequelize.INTEGER,
