@@ -1,0 +1,34 @@
+# 本地开发 / 测试：一键起 MySQL + Redis，无需本机安装数据库服务。
+# 启动：docker compose up -d
+# 清掉容器和数据卷（相当于全新库）：docker compose down -v
+#
+# 默认账号与库名与 README「Docker 快速测试」一致；勿用于公网暴露环境。
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: myproject-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: devpass123
+      MYSQL_DATABASE: myproject_dev
+    ports:
+      - "3306:3306"
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - myproject_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pdevpass123"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    container_name: myproject-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+volumes:
+  myproject_mysql_data:
